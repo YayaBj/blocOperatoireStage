@@ -1,5 +1,6 @@
 package com.example.entity;
 
+import com.example.entity.enums.StatutSalle;
 import jakarta.persistence.*;
 import java.util.List;
 
@@ -18,7 +19,7 @@ public class Salle {
     private String typeSalle;
 
     @Column(name = "statut_salle", nullable = false)
-    private String statutSalle;
+    private StatutSalle statutSalle;
 
     // Relation avec Intervention
     @OneToMany(mappedBy = "salle")
@@ -27,7 +28,7 @@ public class Salle {
     // Constructeurs
     public Salle() {}
 
-    public Salle(String numeroSalle, String typeSalle, String statutSalle) {
+    public Salle(String numeroSalle, String typeSalle, StatutSalle statutSalle) {
         this.numeroSalle = numeroSalle;
         this.typeSalle = typeSalle;
         this.statutSalle = statutSalle;
@@ -55,11 +56,11 @@ public class Salle {
         this.typeSalle = typeSalle;
     }
 
-    public String getStatutSalle() {
+    public StatutSalle getStatutSalle() {
         return statutSalle;
     }
 
-    public void setStatutSalle(String statutSalle) {
+    public void setStatutSalle(StatutSalle statutSalle) {
         this.statutSalle = statutSalle;
     }
 
