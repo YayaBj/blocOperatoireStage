@@ -14,6 +14,9 @@ public class Patient {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "cn_patient", nullable = false)
+    private String cnPatient;
+
     @Column(name = "nom_patient", nullable = false)
     private String nomPatient;
 
@@ -30,7 +33,8 @@ public class Patient {
     // Constructeurs
     public Patient() {}
 
-    public Patient(String nomPatient, String prenomPatient, LocalDate dateNaissance) {
+    public Patient(String cnPatient, String nomPatient, String prenomPatient, LocalDate dateNaissance) {
+        this.cnPatient = cnPatient;
         this.nomPatient = nomPatient;
         this.prenomPatient = prenomPatient;
         this.dateNaissance = dateNaissance;
@@ -72,5 +76,13 @@ public class Patient {
 
     public void setInterventions(List<Intervention> interventions) {
         this.interventions = interventions;
+    }
+
+    public String getCnPatient() {
+        return cnPatient;
+    }
+
+    public void setCnPatient(String cnPatient) {
+        this.cnPatient = cnPatient;
     }
 }
