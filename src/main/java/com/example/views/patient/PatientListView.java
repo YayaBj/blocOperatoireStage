@@ -6,6 +6,7 @@ import com.example.service.PatientService;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.datepicker.DatePicker;
+import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.notification.NotificationVariant;
@@ -34,6 +35,7 @@ public class PatientListView extends VerticalLayout {
     final TextField prenomPatient;
     final DatePicker dateNaissance;
     final Button createBtn;
+    final Button cancelBtn;
     final TextField searchField;
     final Grid<Patient> patientGrid;
 
@@ -57,6 +59,10 @@ public class PatientListView extends VerticalLayout {
         createBtn = new Button("Ajouter", _ -> saveOrUpdatePatient());
         createBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
 
+        cancelBtn = new Button("Annuler", _ -> clearForm());
+        cancelBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
+        cancelBtn.setVisible(false);
+
         searchField = new TextField();
         searchField.setPlaceholder("Rechercher par CN, nom ou prénom");
         searchField.setClearButtonVisible(true);
@@ -64,7 +70,7 @@ public class PatientListView extends VerticalLayout {
 
         var toolbar = new VerticalLayout();
         var gestionPatient = new HorizontalLayout();
-        gestionPatient.add(new ViewTitle("Gestion des patients"), searchField, cnPatient, nomPatient, prenomPatient, dateNaissance, createBtn);
+        gestionPatient.add(new ViewTitle("Gestion des patients"), searchField, cnPatient, nomPatient, prenomPatient, dateNaissance, createBtn, cancelBtn);
         gestionPatient.setFlexGrow(1, searchField, cnPatient, nomPatient, prenomPatient, dateNaissance);
         gestionPatient.setWrap(true);
         gestionPatient.setWidthFull();
@@ -94,11 +100,30 @@ public class PatientListView extends VerticalLayout {
             deleteBtn.addThemeVariants(ButtonVariant.LUMO_ERROR);
 
             deleteBtn.addClickListener(_ -> {
-                patientService.deletePatient(patient);
-                refreshGrid();
+                Dialog confirmDialog = new Dialog();
+                confirmDialog.setHeaderTitle("Confirmation de suppression");
 
-                Notification.show("Patient supprimé", 3000, Notification.Position.BOTTOM_END)
-                        .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+                VerticalLayout dialogLayout = new VerticalLayout();
+                dialogLayout.add("Voulez-vous vraiment supprimer le patient : "
+                        + patient.getNomPatient() + " " + patient.getPrenomPatient() + " ?");
+
+                Button confirmBtn = new Button("Oui, supprimer", event -> {
+                    patientService.deletePatient(patient);
+                    refreshGrid();
+                    confirmDialog.close();
+
+                    Notification.show("Patient supprimé", 3000, Notification.Position.BOTTOM_END)
+                            .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+                });
+                confirmBtn.addThemeVariants(ButtonVariant.LUMO_ERROR);
+
+                Button closeBtn = new Button("Annuler", event -> confirmDialog.close());
+
+                HorizontalLayout actions = new HorizontalLayout(confirmBtn, closeBtn);
+
+                dialogLayout.add(actions);
+                confirmDialog.add(dialogLayout);
+                confirmDialog.open();
             });
 
             return deleteBtn;
@@ -113,6 +138,7 @@ public class PatientListView extends VerticalLayout {
                 prenomPatient.setValue(selectedPatient.getPrenomPatient());
                 dateNaissance.setValue(selectedPatient.getDateNaissance());
                 createBtn.setText("Modifier");
+                cancelBtn.setVisible(true);
             }
         });
 
@@ -207,6 +233,7 @@ public class PatientListView extends VerticalLayout {
         dateNaissance.clear();
         selectedPatient = null;
         createBtn.setText("Ajouter");
+        cancelBtn.setVisible(false);
         patientGrid.asSingleSelect().clear();
     }
 
