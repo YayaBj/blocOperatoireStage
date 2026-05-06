@@ -21,8 +21,6 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.FormatStyle;
 import java.util.Optional;
 
-import static com.vaadin.flow.spring.data.VaadinSpringDataHelpers.toSpringPageRequest;
-
 @Route(value = "patients")
 @PageTitle("Gestion des patients")
 @Menu(order = 1, icon = "icons/user.svg", title = "Patients")
@@ -70,8 +68,8 @@ public class PatientListView extends VerticalLayout {
 
         var toolbar = new VerticalLayout();
         var gestionPatient = new HorizontalLayout();
-        gestionPatient.add(new ViewTitle("Gestion des patients"), searchField, cnPatient, nomPatient, prenomPatient, dateNaissance, createBtn, cancelBtn);
-        gestionPatient.setFlexGrow(1, searchField, cnPatient, nomPatient, prenomPatient, dateNaissance);
+        gestionPatient.add(new ViewTitle("Gestion des patients"), cnPatient, nomPatient, prenomPatient, dateNaissance, createBtn, cancelBtn);
+        gestionPatient.setFlexGrow(1, cnPatient, nomPatient, prenomPatient, dateNaissance);
         gestionPatient.setWrap(true);
         gestionPatient.setWidthFull();
         var searchLine = new HorizontalLayout();

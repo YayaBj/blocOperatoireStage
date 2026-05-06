@@ -10,24 +10,36 @@ public class Stock {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "quantite_totale", nullable = false)
+    private int quantiteTotale;
+
     @Column(name = "quantite_disponible", nullable = false)
     private int quantiteDisponible;
 
-    // Relation avec Materiel (1-1)
+    @Column(name = "seuil_alerte")
+    private int seuilAlerte;
+
     @OneToOne(mappedBy = "stock")
     private Materiel materiel;
 
-    // Constructeurs
     public Stock() {}
 
-    public Stock(int quantiteDisponible) {
+    public Stock(int quantiteTotale, int quantiteDisponible, int seuilAlerte) {
+        this.quantiteTotale = quantiteTotale;
         this.quantiteDisponible = quantiteDisponible;
+        this.seuilAlerte = seuilAlerte;
     }
-
-    // Getters & Setters
 
     public Long getId() {
         return id;
+    }
+
+    public int getQuantiteTotale() {
+        return quantiteTotale;
+    }
+
+    public void setQuantiteTotale(int quantiteTotale) {
+        this.quantiteTotale = quantiteTotale;
     }
 
     public int getQuantiteDisponible() {
@@ -36,6 +48,14 @@ public class Stock {
 
     public void setQuantiteDisponible(int quantiteDisponible) {
         this.quantiteDisponible = quantiteDisponible;
+    }
+
+    public int getSeuilAlerte() {
+        return seuilAlerte;
+    }
+
+    public void setSeuilAlerte(int seuilAlerte) {
+        this.seuilAlerte = seuilAlerte;
     }
 
     public Materiel getMateriel() {

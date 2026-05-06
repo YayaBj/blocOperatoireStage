@@ -5,4 +5,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
 public interface MaterielRepository extends JpaRepository<Materiel, Long>, JpaSpecificationExecutor<Materiel> {
+
+    boolean existsByNomMaterielIgnoreCaseAndTypeMaterielIgnoreCase(String nomMateriel, String typeMateriel);
+
+    Materiel findByNomMaterielIgnoreCaseAndTypeMaterielIgnoreCase(String nomMateriel, String typeMateriel);
 }

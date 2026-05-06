@@ -2,6 +2,8 @@ package com.example.entity;
 
 import com.example.entity.enums.EtatMateriel;
 import jakarta.persistence.*;
+
+import java.util.ArrayList;
 import java.util.List;
 
 @Entity
@@ -18,37 +20,26 @@ public class Materiel {
     @Column(name = "type_materiel", nullable = false)
     private String typeMateriel;
 
-    @Column(name = "quantite_totale", nullable = false)
-    private int quantiteTotale;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "etat", nullable = false)
-    private EtatMateriel etat;
-
-    // Relation avec Stock (1-1)
-    @OneToOne
+    @OneToOne(cascade = CascadeType.ALL)
     @JoinColumn(name = "stock_id")
     private Stock stock;
 
-    // Relation avec InterventionMateriel
-    @OneToMany(mappedBy = "materiel")
-    private List<InterventionMateriel> interventionMateriels;
+    @OneToMany(mappedBy = "materiel", cascade = CascadeType.ALL)
+    private List<UniteMateriel> unites = new ArrayList<>();
 
-    // Relation avec Sterilisation
     @OneToMany(mappedBy = "materiel")
-    private List<Sterilisation> sterilisationList;
+    private List<InterventionMateriel> interventionMateriels = new ArrayList<>();
 
-    // Constructeurs
+    @OneToMany(mappedBy = "materiel")
+    private List<Sterilisation> sterilisationList = new ArrayList<>();
+
     public Materiel() {}
 
-    public Materiel(String nomMateriel, String typeMateriel, int quantiteTotale, EtatMateriel etat) {
+    public Materiel(String nomMateriel, String typeMateriel, Stock stock) {
         this.nomMateriel = nomMateriel;
         this.typeMateriel = typeMateriel;
-        this.quantiteTotale = quantiteTotale;
-        this.etat = etat;
+        this.stock = stock;
     }
-
-    // Getters & Setters
 
     public Long getId() {
         return id;
@@ -68,22 +59,6 @@ public class Materiel {
 
     public void setTypeMateriel(String typeMateriel) {
         this.typeMateriel = typeMateriel;
-    }
-
-    public int getQuantiteTotale() {
-        return quantiteTotale;
-    }
-
-    public void setQuantiteTotale(int quantiteTotale) {
-        this.quantiteTotale = quantiteTotale;
-    }
-
-    public EtatMateriel getEtat() {
-        return etat;
-    }
-
-    public void setEtat(EtatMateriel etat) {
-        this.etat = etat;
     }
 
     public Stock getStock() {
@@ -108,5 +83,13 @@ public class Materiel {
 
     public void setSterilisationList(List<Sterilisation> sterilisationList) {
         this.sterilisationList = sterilisationList;
+    }
+
+    public List<UniteMateriel> getUnites() {
+        return unites;
+    }
+
+    public void setUnites(List<UniteMateriel> unites) {
+        this.unites = unites;
     }
 }

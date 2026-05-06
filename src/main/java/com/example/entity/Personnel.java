@@ -11,6 +11,9 @@ public class Personnel {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "matricule", nullable = false, unique = true)
+    private String matricule;
+
     @Column(name = "nom_personnel", nullable = false)
     private String nomPersonnel;
 
@@ -20,23 +23,28 @@ public class Personnel {
     @Column(name = "specialite", nullable = false)
     private String specialite;
 
-    // Relation avec AffectationPersonnel
     @OneToMany(mappedBy = "personnel")
     private List<AffectationPersonnel> affectations;
 
-    // Constructeurs
     public Personnel() {}
 
-    public Personnel(String nomPersonnel, String prenomPersonnel, String specialite) {
+    public Personnel(String matricule, String nomPersonnel, String prenomPersonnel, String specialite) {
+        this.matricule = matricule;
         this.nomPersonnel = nomPersonnel;
         this.prenomPersonnel = prenomPersonnel;
         this.specialite = specialite;
     }
 
-    // Getters & Setters
-
     public Long getId() {
         return id;
+    }
+
+    public String getMatricule() {
+        return matricule;
+    }
+
+    public void setMatricule(String matricule) {
+        this.matricule = matricule;
     }
 
     public String getNomPersonnel() {

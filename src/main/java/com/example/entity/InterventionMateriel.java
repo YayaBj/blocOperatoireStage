@@ -10,9 +10,6 @@ public class InterventionMateriel {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "quantite", nullable = false)
-    private int quantite;
-
     // Relation avec Intervention
     @ManyToOne
     @JoinColumn(name = "intervention_id", nullable = false)
@@ -20,32 +17,21 @@ public class InterventionMateriel {
 
     // Relation avec Materiel
     @ManyToOne
-    @JoinColumn(name = "materiel_id", nullable = false)
-    private Materiel materiel;
+    @JoinColumn(name = "unite_materiel_id", nullable = false)
+    private UniteMateriel uniteMateriel;
 
     // Constructeurs
     public InterventionMateriel() {}
 
-    public InterventionMateriel(int quantite,
-                                Intervention intervention,
-                                Materiel materiel) {
-        this.quantite = quantite;
+    public InterventionMateriel(Intervention intervention, UniteMateriel uniteMateriel) {
         this.intervention = intervention;
-        this.materiel = materiel;
+        this.uniteMateriel = uniteMateriel;
     }
 
     // Getters & Setters
 
     public Long getId() {
         return id;
-    }
-
-    public int getQuantite() {
-        return quantite;
-    }
-
-    public void setQuantite(int quantite) {
-        this.quantite = quantite;
     }
 
     public Intervention getIntervention() {
@@ -56,11 +42,11 @@ public class InterventionMateriel {
         this.intervention = intervention;
     }
 
-    public Materiel getMateriel() {
-        return materiel;
+    public UniteMateriel getUniteMateriel() {
+        return uniteMateriel;
     }
 
-    public void setMateriel(Materiel materiel) {
-        this.materiel = materiel;
+    public void setUniteMateriel(UniteMateriel uniteMateriel) {
+        this.uniteMateriel = uniteMateriel;
     }
 }

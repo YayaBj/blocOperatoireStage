@@ -24,18 +24,17 @@ public class Sterilisation {
     @Column(name = "statut", nullable = false)
     private StatutSterilisation statut;
 
-    // Relation avec Materiel (ManyToOne)
     @ManyToOne
-    @JoinColumn(name = "materiel_id", nullable = false)
-    private Materiel materiel;
+    @JoinColumn(name = "unite_materiel_id", nullable = false)
+    private UniteMateriel uniteMateriel;
 
     // Constructeurs
     public Sterilisation() {}
 
-    public Sterilisation(LocalDate dateDebut, StatutSterilisation statut, Materiel materiel) {
+    public Sterilisation(LocalDate dateDebut, StatutSterilisation statut, UniteMateriel uniteMateriel) {
         this.dateDebut = dateDebut;
         this.statut = statut;
-        this.materiel = materiel;
+        this.uniteMateriel = uniteMateriel;
     }
 
     // Getters & Setters
@@ -68,11 +67,11 @@ public class Sterilisation {
         this.statut = statut;
     }
 
-    public Materiel getMateriel() {
-        return materiel;
+    public UniteMateriel getUniteMateriel() {
+        return uniteMateriel;
     }
 
-    public void setMateriel(Materiel materiel) {
-        this.materiel = materiel;
+    public void setUniteMateriel(UniteMateriel uniteMateriel) {
+        this.uniteMateriel = uniteMateriel;
     }
 }
