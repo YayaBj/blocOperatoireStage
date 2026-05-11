@@ -1,6 +1,5 @@
 package com.example.entity;
 
-import com.example.entity.enums.EtatMateriel;
 import jakarta.persistence.*;
 
 import java.util.ArrayList;
@@ -26,12 +25,6 @@ public class Materiel {
 
     @OneToMany(mappedBy = "materiel", cascade = CascadeType.ALL)
     private List<UniteMateriel> unites = new ArrayList<>();
-
-    @OneToMany(mappedBy = "materiel")
-    private List<InterventionMateriel> interventionMateriels = new ArrayList<>();
-
-    @OneToMany(mappedBy = "materiel")
-    private List<Sterilisation> sterilisationList = new ArrayList<>();
 
     public Materiel() {}
 
@@ -67,22 +60,6 @@ public class Materiel {
 
     public void setStock(Stock stock) {
         this.stock = stock;
-    }
-
-    public List<InterventionMateriel> getInterventionMateriels() {
-        return interventionMateriels;
-    }
-
-    public void setInterventionMateriels(List<InterventionMateriel> interventionMateriels) {
-        this.interventionMateriels = interventionMateriels;
-    }
-
-    public List<Sterilisation> getSterilisationList() {
-        return sterilisationList;
-    }
-
-    public void setSterilisationList(List<Sterilisation> sterilisationList) {
-        this.sterilisationList = sterilisationList;
     }
 
     public List<UniteMateriel> getUnites() {

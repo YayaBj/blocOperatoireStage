@@ -72,4 +72,20 @@ public class UniteMateriel {
     public void setMateriel(Materiel materiel) {
         this.materiel = materiel;
     }
+
+    public List<InterventionMateriel> getInterventionMateriels() {
+        return interventionMateriels;
+    }
+
+    public void setInterventionMateriels(List<InterventionMateriel> interventionMateriels) {
+        this.interventionMateriels = interventionMateriels;
+    }
+
+    public List<Sterilisation> getSterilisations() {
+        return sterilisations;
+    }
+
+    public void setSterilisations(List<Sterilisation> sterilisations) {
+        this.sterilisations = sterilisations;
+    }
 }

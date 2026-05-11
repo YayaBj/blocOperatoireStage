@@ -15,7 +15,7 @@ public class InterventionMateriel {
     @JoinColumn(name = "intervention_id", nullable = false)
     private Intervention intervention;
 
-    // Relation avec Materiel
+    // Relation avec UniteMateriel
     @ManyToOne
     @JoinColumn(name = "unite_materiel_id", nullable = false)
     private UniteMateriel uniteMateriel;
