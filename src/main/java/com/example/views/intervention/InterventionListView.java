@@ -4,6 +4,7 @@ import com.example.base.ui.ViewTitle;
 import com.example.entity.*;
 import com.example.entity.enums.PrioriteIntervention;
 import com.example.entity.enums.RoleIntervention;
+import com.example.entity.enums.StatutSalle;
 import com.example.service.*;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
@@ -21,6 +22,7 @@ import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.router.Menu;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
+import org.jetbrains.annotations.NotNull;
 
 import java.time.format.DateTimeFormatter;
 import java.time.format.FormatStyle;
@@ -74,7 +76,7 @@ public class InterventionListView extends VerticalLayout {
 
         salle = new ComboBox<>();
         salle.setPlaceholder("Salle");
-        salle.setItems(salleService.findAll());
+        salle.setItems(salleService.findByetat(StatutSalle.DISPONIBLE));
         salle.setItemLabelGenerator(s -> s.getNumeroSalle() + " - " + s.getTypeSalle());
 
         personnels = new MultiSelectComboBox<>();
@@ -90,29 +92,7 @@ public class InterventionListView extends VerticalLayout {
         createBtn = new Button("Créer intervention", _ -> openRoleDialog());
         createBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
 
-        var toolbar = new VerticalLayout();
-
-        var line1 = new HorizontalLayout(
-                new ViewTitle("Gestion des interventions"),
-                typeIntervention,
-                priorite,
-                dateHeureDebut,
-                dureePrevue
-        );
-        line1.setWidthFull();
-        line1.setWrap(true);
-
-        var line2 = new HorizontalLayout(
-                patient,
-                salle,
-                personnels,
-                unitesMateriel,
-                createBtn
-        );
-        line2.setWidthFull();
-        line2.setWrap(true);
-
-        toolbar.add(line1, line2);
+        var toolbar = getVerticalLayout();
 
         var dateFormatter = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM)
                 .withLocale(getLocale());
@@ -153,6 +133,34 @@ public class InterventionListView extends VerticalLayout {
 
         setSizeFull();
         add(toolbar, interventionGrid);
+    }
+
+    @NotNull
+    private VerticalLayout getVerticalLayout() {
+        var toolbar = new VerticalLayout();
+
+        var line1 = new HorizontalLayout(
+                new ViewTitle("Gestion des interventions"),
+                typeIntervention,
+                priorite,
+                dateHeureDebut,
+                dureePrevue
+        );
+        line1.setWidthFull();
+        line1.setWrap(true);
+
+        var line2 = new HorizontalLayout(
+                patient,
+                salle,
+                personnels,
+                unitesMateriel,
+                createBtn
+        );
+        line2.setWidthFull();
+        line2.setWrap(true);
+
+        toolbar.add(line1, line2);
+        return toolbar;
     }
 
     private void createIntervention(Map<Long, RoleIntervention> personnelsAvecRoles) {

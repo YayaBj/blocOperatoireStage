@@ -13,4 +13,6 @@ public interface AffectationPersonnelRepository extends JpaRepository<Affectatio
             List<Long> personnelIds,
             List<StatutIntervention> statuts
     );
+
+    List<AffectationPersonnel> findByInterventionId(Long interventionId);
 }

@@ -6,6 +6,7 @@ import com.example.repository.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -22,6 +23,7 @@ public class InterventionService {
     private final AffectationPersonnelRepository affectationPersonnelRepository;
     private final InterventionMaterielRepository interventionMaterielRepository;
     private final SterilisationRepository sterilisationRepository;
+    private final MaterielRepository materielRepository;
 
     public InterventionService(
             InterventionRepository interventionRepository,
@@ -31,8 +33,8 @@ public class InterventionService {
             UniteMaterielRepository uniteMaterielRepository,
             AffectationPersonnelRepository affectationPersonnelRepository,
             InterventionMaterielRepository interventionMaterielRepository,
-            SterilisationRepository sterilisationRepository
-    ) {
+            SterilisationRepository sterilisationRepository,
+            MaterielRepository materielRepository) {
         this.interventionRepository = interventionRepository;
         this.patientRepository = patientRepository;
         this.salleRepository = salleRepository;
@@ -41,6 +43,7 @@ public class InterventionService {
         this.affectationPersonnelRepository = affectationPersonnelRepository;
         this.interventionMaterielRepository = interventionMaterielRepository;
         this.sterilisationRepository = sterilisationRepository;
+        this.materielRepository = materielRepository;
     }
 
     @Transactional
@@ -120,6 +123,9 @@ public class InterventionService {
 
         for (UniteMateriel unite : unites) {
             InterventionMateriel interventionMateriel = new InterventionMateriel(intervention, unite);
+            unite.setEtat(EtatMateriel.RESERVE);
+            decrementerStockDisponible(unite);
+            uniteMaterielRepository.save(unite);
             interventionMaterielRepository.save(interventionMateriel);
         }
     }
@@ -131,6 +137,9 @@ public class InterventionService {
 
         if (intervention.getStatutIntervention() == StatutIntervention.TERMINEE) {
             throw new IllegalArgumentException("Cette intervention est déjà terminée");
+        }
+        if (intervention.getStatutIntervention() == StatutIntervention.ANNULEE) {
+            throw new IllegalArgumentException("Impossible de terminer une intervention annulée");
         }
 
         intervention.setStatutIntervention(StatutIntervention.TERMINEE);
@@ -148,8 +157,6 @@ public class InterventionService {
                     StatutSterilisation.EN_COURS,
                     unite
             );
-
-            decrementerStockDisponible(unite);
 
             sterilisationRepository.save(sterilisation);
             uniteMaterielRepository.save(unite);
@@ -293,4 +300,216 @@ public class InterventionService {
     public List<UniteMateriel> findUnitesSteriles() {
         return uniteMaterielRepository.findByEtat(EtatMateriel.STERILE);
     }
+
+    @Transactional(readOnly = true)
+    public Intervention findById(Long id) {
+        return interventionRepository.findById(id)
+                .orElseThrow(() ->
+                        new IllegalArgumentException("Intervention introuvable"));
+    }
+
+    @Transactional
+    public void annulerIntervention(Long id) {
+        Intervention intervention = findById(id);
+        intervention.setStatutIntervention(StatutIntervention.ANNULEE);
+        interventionRepository.saveAndFlush(intervention);
+    }
+
+    @Transactional
+    public void deleteIntervention(Long id) {
+        Intervention intervention = findById(id);
+        interventionRepository.delete(intervention);
+    }
+
+    @Transactional
+    public void demarrerIntervention(Long interventionId) {
+
+        Intervention intervention = interventionRepository.findById(interventionId)
+                .orElseThrow(() ->
+                        new IllegalArgumentException("Intervention introuvable"));
+
+        if (intervention.getStatutIntervention() == StatutIntervention.ANNULEE) {
+            throw new IllegalArgumentException("Impossible de démarrer une intervention annulée");
+        }
+
+        if (intervention.getStatutIntervention() == StatutIntervention.TERMINEE) {
+            throw new IllegalArgumentException("Cette intervention est déjà terminée");
+        }
+
+        if (intervention.getStatutIntervention() == StatutIntervention.EN_COURS) {
+            throw new IllegalArgumentException("Cette intervention est déjà en cours");
+        }
+
+        intervention.setStatutIntervention(StatutIntervention.EN_COURS);
+
+        interventionRepository.saveAndFlush(intervention);
+    }
+
+    @Transactional
+    public void deplacerIntervention(Long interventionId, LocalDateTime nouveauDebut, LocalDateTime nouvelleFin) {
+        Intervention intervention = interventionRepository.findById(interventionId)
+                .orElseThrow(() -> new IllegalArgumentException("Intervention introuvable"));
+
+        verifierModificationPlanningPossible(intervention, nouveauDebut, nouvelleFin);
+
+        int nouvelleDuree = (int) Duration.between(nouveauDebut, nouvelleFin).toMinutes();
+
+        verifierDisponibilitePatientUpdate(
+                intervention.getPatient().getId(),
+                nouveauDebut,
+                nouvelleFin,
+                interventionId
+        );
+
+        verifierDisponibiliteSalleUpdate(
+                intervention.getSalle().getId(),
+                nouveauDebut,
+                nouvelleFin,
+                interventionId
+        );
+
+        verifierDisponibilitePersonnelUpdate(
+                interventionId,
+                nouveauDebut,
+                nouvelleFin
+        );
+
+        verifierDisponibiliteMaterielUpdate(
+                interventionId,
+                nouveauDebut,
+                nouvelleFin
+        );
+
+        intervention.setDateHeureDebut(nouveauDebut);
+        intervention.setDureePrevue(nouvelleDuree);
+
+        interventionRepository.saveAndFlush(intervention);
+    }
+
+    @Transactional
+    public void redimensionnerIntervention(Long interventionId, LocalDateTime nouveauDebut, LocalDateTime nouvelleFin) {
+        deplacerIntervention(interventionId, nouveauDebut, nouvelleFin);
+    }
+
+    private void verifierModificationPlanningPossible(Intervention intervention, LocalDateTime nouveauDebut, LocalDateTime nouvelleFin) {
+        if (nouveauDebut == null || nouvelleFin == null) {
+            throw new IllegalArgumentException("Le nouveau créneau est invalide");
+        }
+
+        if (!nouvelleFin.isAfter(nouveauDebut)) {
+            throw new IllegalArgumentException("La fin doit être après le début");
+        }
+
+        if (intervention.getStatutIntervention() == StatutIntervention.TERMINEE) {
+            throw new IllegalArgumentException("Impossible de modifier une intervention terminée");
+        }
+
+        if (intervention.getStatutIntervention() == StatutIntervention.ANNULEE) {
+            throw new IllegalArgumentException("Impossible de modifier une intervention annulée");
+        }
+    }
+
+    private void verifierDisponibilitePatientUpdate(
+            Long patientId,
+            LocalDateTime debut,
+            LocalDateTime fin,
+            Long interventionIgnoreeId
+    ) {
+        List<Intervention> interventions = interventionRepository.findByPatientIdAndStatutInterventionIn(
+                patientId,
+                statutsBloquants()
+        );
+
+        boolean conflit = interventions.stream()
+                .filter(intervention -> !intervention.getId().equals(interventionIgnoreeId))
+                .anyMatch(intervention -> chevauche(debut, fin, intervention));
+
+        if (conflit) {
+            throw new IllegalArgumentException("Le patient a déjà une intervention sur ce créneau");
+        }
+    }
+
+    private void verifierDisponibiliteSalleUpdate(
+            Long salleId,
+            LocalDateTime debut,
+            LocalDateTime fin,
+            Long interventionIgnoreeId
+    ) {
+        List<Intervention> interventions = interventionRepository.findBySalleIdAndStatutInterventionIn(
+                salleId,
+                statutsBloquants()
+        );
+
+        boolean conflit = interventions.stream()
+                .filter(intervention -> !intervention.getId().equals(interventionIgnoreeId))
+                .anyMatch(intervention -> chevauche(debut, fin, intervention));
+
+        if (conflit) {
+            throw new IllegalArgumentException("La salle est déjà occupée sur ce créneau");
+        }
+    }
+
+    private void verifierDisponibilitePersonnelUpdate(
+            Long interventionId,
+            LocalDateTime debut,
+            LocalDateTime fin
+    ) {
+        List<AffectationPersonnel> affectationsIntervention =
+                affectationPersonnelRepository.findByInterventionId(interventionId);
+
+        List<Long> personnelIds = affectationsIntervention.stream()
+                .map(affectation -> affectation.getPersonnel().getId())
+                .toList();
+
+        if (personnelIds.isEmpty()) {
+            return;
+        }
+
+        List<AffectationPersonnel> affectations =
+                affectationPersonnelRepository.findByPersonnelIdInAndInterventionStatutInterventionIn(
+                        personnelIds,
+                        statutsBloquants()
+                );
+
+        boolean conflit = affectations.stream()
+                .filter(affectation -> !affectation.getIntervention().getId().equals(interventionId))
+                .anyMatch(affectation -> chevauche(debut, fin, affectation.getIntervention()));
+
+        if (conflit) {
+            throw new IllegalArgumentException("Un membre du personnel est déjà affecté sur ce créneau");
+        }
+    }
+
+    private void verifierDisponibiliteMaterielUpdate(
+            Long interventionId,
+            LocalDateTime debut,
+            LocalDateTime fin
+    ) {
+        List<InterventionMateriel> materielsIntervention =
+                interventionMaterielRepository.findByInterventionId(interventionId);
+
+        List<Long> uniteIds = materielsIntervention.stream()
+                .map(interventionMateriel -> interventionMateriel.getUniteMateriel().getId())
+                .toList();
+
+        if (uniteIds.isEmpty()) {
+            return;
+        }
+
+        List<InterventionMateriel> materielsUtilises =
+                interventionMaterielRepository.findByUniteMaterielIdInAndInterventionStatutInterventionIn(
+                        uniteIds,
+                        statutsBloquants()
+                );
+
+        boolean conflit = materielsUtilises.stream()
+                .filter(interventionMateriel -> !interventionMateriel.getIntervention().getId().equals(interventionId))
+                .anyMatch(interventionMateriel -> chevauche(debut, fin, interventionMateriel.getIntervention()));
+
+        if (conflit) {
+            throw new IllegalArgumentException("Une unité de matériel est déjà réservée sur ce créneau");
+        }
+    }
+
+
 }

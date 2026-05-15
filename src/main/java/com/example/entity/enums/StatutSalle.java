@@ -2,6 +2,6 @@ package com.example.entity.enums;
 
 public enum StatutSalle {
     DISPONIBLE,
-    OCCUPEE,
+    EN_NETTOYAGE,
     MAINTENANCE
 }

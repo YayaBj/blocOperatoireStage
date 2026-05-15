@@ -4,6 +4,7 @@ import com.example.entity.enums.PrioriteIntervention;
 import com.example.entity.enums.StatutIntervention;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 @Entity
@@ -45,12 +46,12 @@ public class Intervention {
     private Salle salle;
 
     // Relation avec AffectationPersonnel
-    @OneToMany(mappedBy = "intervention")
-    private List<AffectationPersonnel> affectations;
+    @OneToMany(mappedBy = "intervention", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<AffectationPersonnel> affectations = new ArrayList<>();
 
     // Relation avec InterventionMateriel
-    @OneToMany(mappedBy = "intervention")
-    private List<InterventionMateriel> interventionMateriels;
+    @OneToMany(mappedBy = "intervention", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<InterventionMateriel> interventionMateriels = new  ArrayList<>();
 
     // Constructeurs
     public Intervention() {}
