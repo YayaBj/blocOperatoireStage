@@ -311,9 +311,27 @@ public class InterventionService {
     @Transactional
     public void annulerIntervention(Long id) {
         Intervention intervention = findById(id);
+
+        List<InterventionMateriel> materielsIntervention =
+                interventionMaterielRepository.findByInterventionId(id);
+
+        for (InterventionMateriel im : materielsIntervention) {
+            UniteMateriel unite = im.getUniteMateriel();
+
+            unite.setEtat(EtatMateriel.STERILE);
+
+            Materiel materiel = unite.getMateriel();
+            if (materiel != null && materiel.getStock() != null) {
+                materiel.getStock().setQuantiteDisponible(materiel.getStock().getQuantiteDisponible() + 1);
+            }
+
+            uniteMaterielRepository.save(unite);
+        }
+
         intervention.setStatutIntervention(StatutIntervention.ANNULEE);
         interventionRepository.saveAndFlush(intervention);
     }
+
 
     @Transactional
     public void deleteIntervention(Long id) {
