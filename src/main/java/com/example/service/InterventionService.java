@@ -23,7 +23,6 @@ public class InterventionService {
     private final AffectationPersonnelRepository affectationPersonnelRepository;
     private final InterventionMaterielRepository interventionMaterielRepository;
     private final SterilisationRepository sterilisationRepository;
-    private final MaterielRepository materielRepository;
 
     public InterventionService(
             InterventionRepository interventionRepository,
@@ -33,8 +32,7 @@ public class InterventionService {
             UniteMaterielRepository uniteMaterielRepository,
             AffectationPersonnelRepository affectationPersonnelRepository,
             InterventionMaterielRepository interventionMaterielRepository,
-            SterilisationRepository sterilisationRepository,
-            MaterielRepository materielRepository) {
+            SterilisationRepository sterilisationRepository) {
         this.interventionRepository = interventionRepository;
         this.patientRepository = patientRepository;
         this.salleRepository = salleRepository;
@@ -43,7 +41,6 @@ public class InterventionService {
         this.affectationPersonnelRepository = affectationPersonnelRepository;
         this.interventionMaterielRepository = interventionMaterielRepository;
         this.sterilisationRepository = sterilisationRepository;
-        this.materielRepository = materielRepository;
     }
 
     @Transactional
