@@ -2,9 +2,9 @@ package com.example.views;
 
 import com.example.entity.*;
 import com.example.entity.enums.PrioriteIntervention;
-import com.example.entity.enums.RoleIntervention;
 import com.example.entity.enums.StatutIntervention;
 import com.example.service.*;
+import com.example.views.components.RolePersonnelDialog;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.combobox.MultiSelectComboBox;
@@ -26,9 +26,7 @@ import org.vaadin.stefan.fullcalendar.*;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.HashMap;
 import java.util.Locale;
-import java.util.Map;
 
 @Route("")
 @PageTitle("Planning")
@@ -318,70 +316,36 @@ public class PlanningView extends VerticalLayout {
             MultiSelectComboBox<Personnel> personnels,
             MultiSelectComboBox<UniteMateriel> unitesMateriel
     ) {
-        Dialog roleDialog = new Dialog();
-        roleDialog.setHeaderTitle("Rôles du personnel");
+        RolePersonnelDialog roleDialog = new RolePersonnelDialog(
+                personnels.getValue(),
+                personnelsAvecRoles -> {
+                    try {
+                        interventionService.createIntervention(
+                                typeIntervention,
+                                priorite,
+                                dateHeureDebut,
+                                dureePrevue,
+                                patient.getId(),
+                                salle.getId(),
+                                personnelsAvecRoles,
+                                unitesMateriel.getValue().stream()
+                                        .map(UniteMateriel::getId)
+                                        .toList()
+                        );
 
-        VerticalLayout layout = new VerticalLayout();
+                        Notification.show("Intervention créée", 3000, Notification.Position.BOTTOM_END)
+                                .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
 
-        Map<Personnel, ComboBox<RoleIntervention>> roleMap = new HashMap<>();
+                        parentDialog.close();
+                        loadInterventions(calendar);
 
-        for (Personnel personnel : personnels.getValue()) {
-            ComboBox<RoleIntervention> roleComboBox = new ComboBox<>();
-            roleComboBox.setLabel(personnel.getNomPersonnel() + " " + personnel.getPrenomPersonnel());
-            roleComboBox.setItems(RoleIntervention.values());
-
-            roleMap.put(personnel, roleComboBox);
-            layout.add(roleComboBox);
-        }
-
-        Button confirmBtn = new Button("Confirmer", event -> {
-            Map<Long, RoleIntervention> personnelsAvecRoles = new HashMap<>();
-
-            for (Map.Entry<Personnel, ComboBox<RoleIntervention>> entry : roleMap.entrySet()) {
-                RoleIntervention role = entry.getValue().getValue();
-
-                if (role == null) {
-                    entry.getValue().setInvalid(true);
-                    entry.getValue().setErrorMessage("Le rôle est obligatoire");
-                    return;
+                    } catch (IllegalArgumentException e) {
+                        Notification.show(e.getMessage(), 4000, Notification.Position.BOTTOM_END)
+                                .addThemeVariants(NotificationVariant.LUMO_ERROR);
+                    }
                 }
+        );
 
-                personnelsAvecRoles.put(entry.getKey().getId(), role);
-            }
-
-            try {
-                interventionService.createIntervention(
-                        typeIntervention,
-                        priorite,
-                        dateHeureDebut,
-                        dureePrevue,
-                        patient.getId(),
-                        salle.getId(),
-                        personnelsAvecRoles,
-                        unitesMateriel.getValue().stream()
-                                .map(UniteMateriel::getId)
-                                .toList()
-                );
-
-                Notification.show("Intervention créée", 3000, Notification.Position.BOTTOM_END)
-                        .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
-
-                roleDialog.close();
-                parentDialog.close();
-                loadInterventions(calendar);
-
-            } catch (IllegalArgumentException e) {
-                Notification.show(e.getMessage(), 4000, Notification.Position.BOTTOM_END)
-                        .addThemeVariants(NotificationVariant.LUMO_ERROR);
-            }
-        });
-
-        Button cancelBtn = new Button("Annuler", event -> roleDialog.close());
-
-        layout.add(new HorizontalLayout(confirmBtn, cancelBtn));
-        layout.setWidth("500px");
-
-        roleDialog.add(layout);
         roleDialog.open();
     }
 

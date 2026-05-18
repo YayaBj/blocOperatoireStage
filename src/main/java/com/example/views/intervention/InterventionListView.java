@@ -6,12 +6,12 @@ import com.example.entity.enums.PrioriteIntervention;
 import com.example.entity.enums.RoleIntervention;
 import com.example.entity.enums.StatutSalle;
 import com.example.service.*;
+import com.example.views.components.RolePersonnelDialog;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.combobox.MultiSelectComboBox;
 import com.vaadin.flow.component.datetimepicker.DateTimePicker;
-import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.notification.NotificationVariant;
@@ -26,7 +26,6 @@ import org.jetbrains.annotations.NotNull;
 
 import java.time.format.DateTimeFormatter;
 import java.time.format.FormatStyle;
-import java.util.HashMap;
 import java.util.Map;
 
 @Route(value = "interventions")
@@ -215,57 +214,11 @@ public class InterventionListView extends VerticalLayout {
             return;
         }
 
-        Dialog dialog = new Dialog();
-        dialog.setHeaderTitle("Rôles du personnel");
+        RolePersonnelDialog dialog = new RolePersonnelDialog(
+                personnels.getValue(),
+                this::createIntervention
+        );
 
-        VerticalLayout layout = new VerticalLayout();
-
-        Map<Personnel, ComboBox<RoleIntervention>> roleMap = new HashMap<>();
-
-        for (Personnel personnelSelectionne : personnels.getValue()) {
-            ComboBox<RoleIntervention> roleComboBox = new ComboBox<>();
-            roleComboBox.setLabel(
-                    personnelSelectionne.getNomPersonnel() + " " + personnelSelectionne.getPrenomPersonnel()
-            );
-            roleComboBox.setItems(RoleIntervention.values());
-            roleComboBox.setPlaceholder("Choisir un rôle");
-
-            roleMap.put(personnelSelectionne, roleComboBox);
-            layout.add(roleComboBox);
-        }
-
-        Button confirmBtn = new Button("Confirmer", event -> {
-            Map<Long, RoleIntervention> personnelsAvecRoles = new HashMap<>();
-
-            for (Map.Entry<Personnel, ComboBox<RoleIntervention>> entry : roleMap.entrySet()) {
-                Personnel personnelSelectionne = entry.getKey();
-                ComboBox<RoleIntervention> roleComboBox = entry.getValue();
-
-                RoleIntervention role = roleComboBox.getValue();
-
-                if (role == null) {
-                    roleComboBox.setInvalid(true);
-                    roleComboBox.setErrorMessage("Le rôle est obligatoire");
-                    return;
-                }
-
-                personnelsAvecRoles.put(personnelSelectionne.getId(), role);
-            }
-
-            createIntervention(personnelsAvecRoles);
-            dialog.close();
-        });
-
-        confirmBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
-
-        Button cancelBtn = new Button("Annuler", event -> dialog.close());
-
-        HorizontalLayout actions = new HorizontalLayout(confirmBtn, cancelBtn);
-
-        layout.add(actions);
-        layout.setWidth("500px");
-
-        dialog.add(layout);
         dialog.open();
     }
 
