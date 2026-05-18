@@ -13,7 +13,7 @@ import com.vaadin.flow.router.Route;
 
 @Route("sterilisations")
 @PageTitle("Stérilisation")
-@Menu(order = 7, icon = "icons/refresh.svg", title = "Stérilisation")
+@Menu(order = 6, icon = "icons/refresh.svg", title = "Stérilisation")
 public class SterilisationListView extends VerticalLayout {
 
     private final SterilisationService sterilisationService;

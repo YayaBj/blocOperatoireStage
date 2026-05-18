@@ -31,7 +31,7 @@ import java.util.Map;
 
 @Route(value = "interventions")
 @PageTitle("Gestion des interventions")
-@Menu(order = 5, icon = "icons/clipboard-check.svg", title = "Interventions")
+@Menu(order = 5, icon = "", title = "Interventions")
 public class InterventionListView extends VerticalLayout {
 
     private final InterventionService interventionService;

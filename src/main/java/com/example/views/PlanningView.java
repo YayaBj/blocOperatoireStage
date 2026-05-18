@@ -26,14 +26,13 @@ import org.vaadin.stefan.fullcalendar.*;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.temporal.TemporalAmount;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 
-@Route("planning")
+@Route("")
 @PageTitle("Planning")
-@Menu(order = 6, icon = "icons/calendar.svg", title = "Planning")
+@Menu(order = 1, icon = "icons/calendar.svg", title = "Planning")
 public class PlanningView extends VerticalLayout {
 
     private final InterventionService interventionService;
