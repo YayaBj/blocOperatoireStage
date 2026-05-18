@@ -103,9 +103,6 @@ public class PlanningView extends VerticalLayout {
                     updatedEntry.getCustomProperty("interventionId").toString()
             );
 
-            for (var method : event.getClass().getMethods()) {
-                System.out.println(method.getName());
-            }
             try {
 
                 interventionService.deplacerIntervention(

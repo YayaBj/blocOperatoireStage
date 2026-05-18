@@ -1,6 +1,5 @@
 package com.example.repository;
 
-import com.example.entity.Personnel;
 import com.example.entity.Salle;
 import com.example.entity.enums.StatutSalle;
 import org.springframework.data.domain.Page;

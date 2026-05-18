@@ -20,7 +20,7 @@ public final class MainLayout extends AppLayout {
 
     MainLayout() {
         setPrimarySection(Section.DRAWER);
-        addToDrawer(createApplicationHeader(), createApplicationDrawer(), createApplicationFooter());
+        addToDrawer(createApplicationHeader(), createApplicationDrawer());
     }
 
     private Component createApplicationHeader() {
@@ -42,13 +42,6 @@ public final class MainLayout extends AppLayout {
         var scroller = new Scroller(createSideNav());
         scroller.addThemeVariants(ScrollerVariant.OVERFLOW_INDICATORS);
         return scroller;
-    }
-
-    private Component createApplicationFooter() {
-        var footer = new VerticalLayout(new Span("Made with ❤️ with Vaadin"));
-        footer.setAlignItems(FlexComponent.Alignment.CENTER);
-        footer.addClassName("app-footer");
-        return footer;
     }
 
     private SideNav createSideNav() {

@@ -76,7 +76,7 @@ public class InterventionListView extends VerticalLayout {
 
         salle = new ComboBox<>();
         salle.setPlaceholder("Salle");
-        salle.setItems(salleService.findByetat(StatutSalle.DISPONIBLE));
+        salle.setItems(salleService.findByStatut(StatutSalle.DISPONIBLE));
         salle.setItemLabelGenerator(s -> s.getNumeroSalle() + " - " + s.getTypeSalle());
 
         personnels = new MultiSelectComboBox<>();

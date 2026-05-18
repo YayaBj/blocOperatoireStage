@@ -18,6 +18,7 @@ public class Salle {
     @Column(name = "type_salle", nullable = false)
     private String typeSalle;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "statut_salle", nullable = false)
     private StatutSalle statutSalle;
 

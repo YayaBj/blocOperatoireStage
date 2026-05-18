@@ -20,17 +20,60 @@ public class PatientService {
 
     @Transactional
     public void createPatient(String carteNationalPatient, String nomPatient, String prenomPatient, LocalDate dateNaissance) {
-        var patient = new Patient(carteNationalPatient, nomPatient, prenomPatient, dateNaissance);
+        validerPatient(carteNationalPatient, nomPatient, prenomPatient, dateNaissance);
+
+        String cn = carteNationalPatient.trim().toUpperCase().replace("-", "");
+
+        if (patientRepository.findByCnPatient(cn) != null) {
+            throw new IllegalArgumentException("Le patient est déjà dans la base de données");
+        }
+
+        var patient = new Patient(cn, nomPatient.trim(), prenomPatient.trim(), dateNaissance);
         patientRepository.saveAndFlush(patient);
     }
 
     @Transactional
     public void updatePatient(Patient patient, String carteNationalPatient, String nomPatient, String prenomPatient, LocalDate dateNaissance) {
-        patient.setCnPatient(carteNationalPatient);
-        patient.setNomPatient(nomPatient);
-        patient.setPrenomPatient(prenomPatient);
+        validerPatient(carteNationalPatient, nomPatient, prenomPatient, dateNaissance);
+
+        String cn = carteNationalPatient.trim().toUpperCase().replace("-", "");
+
+        Patient existingPatient = patientRepository.findByCnPatient(cn);
+
+        if (existingPatient != null && !existingPatient.getId().equals(patient.getId())) {
+            throw new IllegalArgumentException("Ce CN est déjà utilisé par un autre patient");
+        }
+
+        patient.setCnPatient(cn);
+        patient.setNomPatient(nomPatient.trim());
+        patient.setPrenomPatient(prenomPatient.trim());
         patient.setDateNaissance(dateNaissance);
+
         patientRepository.saveAndFlush(patient);
+    }
+
+    private void validerPatient(String carteNationalPatient, String nomPatient, String prenomPatient, LocalDate dateNaissance) {
+        if (carteNationalPatient == null || carteNationalPatient.trim().isBlank()) {
+            throw new IllegalArgumentException("Le CN est obligatoire");
+        }
+
+        String cn = carteNationalPatient.trim().toUpperCase().replace("-", "");
+
+        if (!cn.matches("^[A-Z]{1,2}[0-9]{5,7}$")) {
+            throw new IllegalArgumentException("Format CN marocain invalide, exemple : BK123456");
+        }
+
+        if (nomPatient == null || nomPatient.trim().isBlank()) {
+            throw new IllegalArgumentException("Le nom est obligatoire");
+        }
+
+        if (prenomPatient == null || prenomPatient.trim().isBlank()) {
+            throw new IllegalArgumentException("Le prénom est obligatoire");
+        }
+
+        if (dateNaissance == null) {
+            throw new IllegalArgumentException("La date de naissance est obligatoire");
+        }
     }
 
     @Transactional(readOnly = true)

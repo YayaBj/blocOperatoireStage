@@ -148,80 +148,37 @@ public class PatientListView extends VerticalLayout {
     }
 
     private void saveOrUpdatePatient() {
-        String cn = cnPatient.getValue().trim().toUpperCase().replace("-", "");
-        String nom = nomPatient.getValue().trim();
-        String prenom = prenomPatient.getValue().trim();
+        try {
+            if (selectedPatient == null) {
+                patientService.createPatient(
+                        cnPatient.getValue(),
+                        nomPatient.getValue(),
+                        prenomPatient.getValue(),
+                        dateNaissance.getValue()
+                );
 
-        if (cn.isBlank()) {
-            cnPatient.setInvalid(true);
-            cnPatient.setErrorMessage("Le CN est obligatoire");
-            return;
+                Notification.show("Patient ajouté", 3000, Notification.Position.BOTTOM_END)
+                        .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+            } else {
+                patientService.updatePatient(
+                        selectedPatient,
+                        cnPatient.getValue(),
+                        nomPatient.getValue(),
+                        prenomPatient.getValue(),
+                        dateNaissance.getValue()
+                );
+
+                Notification.show("Patient modifié", 3000, Notification.Position.BOTTOM_END)
+                        .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+            }
+
+            refreshGrid();
+            clearForm();
+
+        } catch (IllegalArgumentException e) {
+            Notification.show(e.getMessage(), 4000, Notification.Position.BOTTOM_END)
+                    .addThemeVariants(NotificationVariant.LUMO_ERROR);
         }
-
-        if (!cn.matches("^[A-Z]{1,2}[0-9]{5,7}$")) {
-            cnPatient.setInvalid(true);
-            cnPatient.setErrorMessage("Format CN marocain invalide, exemple : BK123456");
-            return;
-        }
-
-        if(patientService.getPatientByIdCN(cn) != null && selectedPatient == null) {
-            cnPatient.setInvalid(true);
-            cnPatient.setErrorMessage("Le patient est déjà dans la base de données");
-            return;
-        }
-
-        cnPatient.setInvalid(false);
-
-        if (nom.isBlank()) {
-            nomPatient.setInvalid(true);
-            nomPatient.setErrorMessage("Le nom est obligatoire");
-            return;
-        }
-
-        nomPatient.setInvalid(false);
-
-        if (prenom.isBlank()) {
-            prenomPatient.setInvalid(true);
-            prenomPatient.setErrorMessage("Le prénom est obligatoire");
-            return;
-        }
-
-        prenomPatient.setInvalid(false);
-
-        if (dateNaissance.getValue() == null) {
-            dateNaissance.setInvalid(true);
-            dateNaissance.setErrorMessage("La date de naissance est obligatoire");
-            return;
-        }
-
-        dateNaissance.setInvalid(false);
-
-        if (selectedPatient == null) {
-            patientService.createPatient(
-                    cn,
-                    nom,
-                    prenom,
-                    dateNaissance.getValue()
-            );
-
-            Notification.show("Patient ajouté", 3000, Notification.Position.BOTTOM_END)
-                    .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
-
-        } else {
-            patientService.updatePatient(
-                    selectedPatient,
-                    cn,
-                    nom,
-                    prenom,
-                    dateNaissance.getValue()
-            );
-
-            Notification.show("Patient modifié", 3000, Notification.Position.BOTTOM_END)
-                    .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
-        }
-
-        refreshGrid();
-        clearForm();
     }
 
     private void clearForm() {

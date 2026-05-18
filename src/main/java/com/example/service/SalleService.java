@@ -37,7 +37,7 @@ public class SalleService {
     }
 
     @Transactional(readOnly = true)
-    public List<Salle> findByetat(StatutSalle statutSalle) {
+    public List<Salle> findByStatut(StatutSalle statutSalle) {
         return salleRepository.findByStatutSalle(statutSalle);
     }
 
