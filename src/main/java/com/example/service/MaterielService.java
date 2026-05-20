@@ -36,7 +36,7 @@ public class MaterielService {
         for (int i = 1; i <= quantiteTotale; i++) {
             EtatMateriel etat = i <= quantiteDisponible
                     ? EtatMateriel.STERILE
-                    : EtatMateriel.UTILISE;
+                    : EtatMateriel.INDISPONIBLE;
 
             String codeInventaire = generateCodeInventaire(nomMateriel, i);
 

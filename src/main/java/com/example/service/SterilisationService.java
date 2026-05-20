@@ -26,26 +26,51 @@ public class SterilisationService {
     }
 
     @Transactional(readOnly = true)
-    public List<Sterilisation> findSterilisationsEnCours() {
-        return sterilisationRepository.findByStatut(StatutSterilisation.EN_COURS);
+    public List<Sterilisation> findAll() {
+        return sterilisationRepository.findAll();
     }
 
     @Transactional
-    public void validerSterilisation(Sterilisation sterilisation) {
-        Sterilisation sterilisationDb = sterilisationRepository.findById(sterilisation.getId())
+    public void avancerSterilisation(Long sterilisationId) {
+        Sterilisation sterilisation = sterilisationRepository.findById(sterilisationId)
                 .orElseThrow(() -> new IllegalArgumentException("Stérilisation introuvable"));
 
-        UniteMateriel unite = sterilisationDb.getUniteMateriel();
+        if (sterilisation.getStatut() == StatutSterilisation.TERMINEE) {
+            throw new IllegalArgumentException("Cette stérilisation est déjà terminée");
+        }
 
-        sterilisationDb.setStatut(StatutSterilisation.TERMINE);
-        sterilisationDb.setDateFin(LocalDate.now());
+        if (sterilisation.getStatut() == StatutSterilisation.ECHEC) {
+            throw new IllegalArgumentException("Cette stérilisation est en échec");
+        }
 
-        unite.setEtat(EtatMateriel.STERILE);
+        StatutSterilisation prochainStatut = getNextStatut(sterilisation.getStatut());
+        sterilisation.setStatut(prochainStatut);
 
-        incrementerStockDisponible(unite);
+        if (prochainStatut == StatutSterilisation.TERMINEE) {
+            UniteMateriel unite = sterilisation.getUniteMateriel();
 
-        uniteMaterielRepository.save(unite);
-        sterilisationRepository.saveAndFlush(sterilisationDb);
+            unite.setEtat(EtatMateriel.STERILE);
+            sterilisation.setDateFin(LocalDate.now());
+
+            incrementerStockDisponible(unite);
+
+            uniteMaterielRepository.save(unite);
+        }
+
+        sterilisationRepository.saveAndFlush(sterilisation);
+    }
+
+    public StatutSterilisation getNextStatut(StatutSterilisation statut) {
+        return switch (statut) {
+            case EN_ATTENTE_COLLECTE -> StatutSterilisation.EN_TRANSPORT;
+            case EN_TRANSPORT -> StatutSterilisation.EN_LAVAGE;
+            case EN_LAVAGE -> StatutSterilisation.CONTROLE_QUALITE;
+            case CONTROLE_QUALITE -> StatutSterilisation.EN_EMBALLAGE;
+            case EN_EMBALLAGE -> StatutSterilisation.EN_AUTOCLAVE;
+            case EN_AUTOCLAVE -> StatutSterilisation.VALIDATION_CYCLE;
+            case VALIDATION_CYCLE -> StatutSterilisation.TERMINEE;
+            default -> statut;
+        };
     }
 
     private void incrementerStockDisponible(UniteMateriel unite) {

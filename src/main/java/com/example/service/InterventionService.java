@@ -151,7 +151,7 @@ public class InterventionService {
 
             Sterilisation sterilisation = new Sterilisation(
                     LocalDate.now(),
-                    StatutSterilisation.EN_COURS,
+                    StatutSterilisation.EN_ATTENTE_COLLECTE,
                     unite
             );
 
@@ -356,6 +356,16 @@ public class InterventionService {
         }
 
         intervention.setStatutIntervention(StatutIntervention.EN_COURS);
+
+
+        List<InterventionMateriel> materiels =
+                interventionMaterielRepository.findByInterventionId(interventionId);
+
+        for (InterventionMateriel interventionMateriel : materiels) {
+            UniteMateriel unite = interventionMateriel.getUniteMateriel();
+            unite.setEtat(EtatMateriel.EN_UTILISATION);
+            uniteMaterielRepository.save(unite);
+        }
 
         interventionRepository.saveAndFlush(intervention);
     }

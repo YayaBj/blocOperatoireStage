@@ -59,7 +59,7 @@ public class DataInitializer implements CommandLineRunner {
 
     private void createMaterielIfEmpty() {
         try {
-            materielService.createMateriel("Scalpel", "Instrument chirurgical", 10, 10, 2);
+            materielService.createMateriel("Scalpel", "Instrument chirurgical", 10, 8, 2);
             materielService.createMateriel("Pince chirurgicale", "Instrument chirurgical", 8, 8, 2);
             materielService.createMateriel("Respirateur", "Équipement médical", 3, 3, 1);
             materielService.createMateriel("Set de suture", "Consommable", 15, 15, 5);

@@ -55,7 +55,7 @@ public class RolePersonnelDialog extends Dialog {
 
         confirmBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
 
-        Button cancelBtn = new Button("Annuler", event -> close());
+        Button cancelBtn = new Button("Annuler", _ -> close());
 
         layout.add(new HorizontalLayout(confirmBtn, cancelBtn));
         layout.setWidth("500px");
