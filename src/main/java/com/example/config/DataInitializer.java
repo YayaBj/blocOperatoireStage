@@ -11,7 +11,15 @@ import com.example.service.MaterielService;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
+import com.example.entity.UniteMateriel;
+import com.example.entity.enums.PrioriteIntervention;
+import com.example.entity.enums.StatutMachine;
+import com.example.entity.enums.TypeMachine;
+import com.example.service.BoiteChirurgicaleService;
+import com.example.service.MachineService;
+import com.example.service.UniteMaterielService;
 
+import java.util.List;
 import java.time.LocalDate;
 
 @Component
@@ -21,15 +29,24 @@ public class DataInitializer implements CommandLineRunner {
     private final SalleRepository salleRepository;
     private final PersonnelRepository personnelRepository;
     private final MaterielService materielService;
+    private final BoiteChirurgicaleService boiteChirurgicaleService;
+    private final MachineService machineService;
+    private final UniteMaterielService uniteMaterielService;
 
     public DataInitializer(PatientRepository patientRepository,
                            SalleRepository salleRepository,
                            PersonnelRepository personnelRepository,
-                           MaterielService materielService) {
+                           MaterielService materielService,
+                           BoiteChirurgicaleService boiteChirurgicaleService,
+                           MachineService machineService,
+                           UniteMaterielService uniteMaterielService) {
         this.patientRepository = patientRepository;
         this.salleRepository = salleRepository;
         this.personnelRepository = personnelRepository;
         this.materielService = materielService;
+        this.boiteChirurgicaleService = boiteChirurgicaleService;
+        this.machineService = machineService;
+        this.uniteMaterielService = uniteMaterielService;
     }
 
     @Override
@@ -55,6 +72,8 @@ public class DataInitializer implements CommandLineRunner {
         }
 
         createMaterielIfEmpty();
+        createMachinesIfEmpty();
+        createBoitesIfEmpty();
     }
 
     private void createMaterielIfEmpty() {
@@ -65,6 +84,54 @@ public class DataInitializer implements CommandLineRunner {
             materielService.createMateriel("Set de suture", "Consommable", 15, 15, 5);
         } catch (IllegalArgumentException ignored) {
             // Le matériel existe déjà, donc on ne fait rien.
+        }
+    }
+
+    private void createMachinesIfEmpty() {
+        try {
+            machineService.createMachine("Laveur désinfecteur 01", TypeMachine.LAVAGE, 45, null, StatutMachine.IDLE);
+            machineService.createMachine("Laveur désinfecteur 02", TypeMachine.LAVAGE, 50, null, StatutMachine.IDLE);
+            machineService.createMachine("Autoclave vapeur 01", TypeMachine.STERILISATION, 90, null, StatutMachine.IDLE);
+            machineService.createMachine("Autoclave vapeur 02", TypeMachine.STERILISATION, 100, null, StatutMachine.IDLE);
+        } catch (IllegalArgumentException ignored) {
+        }
+    }
+
+    private void createBoitesIfEmpty() {
+        try {
+            List<UniteMateriel> unites = uniteMaterielService.findAll();
+
+            if (unites.size() < 6) {
+                return;
+            }
+
+            boiteChirurgicaleService.createBoite(
+                    "BOX-APP-001",
+                    "Boîte appendicectomie",
+                    PrioriteIntervention.NORMALE,
+                    "Bloc opératoire",
+                    "Chirurgie générale",
+                    List.of(
+                            unites.get(0).getId(),
+                            unites.get(1).getId(),
+                            unites.get(2).getId()
+                    )
+            );
+
+            boiteChirurgicaleService.createBoite(
+                    "BOX-ORTH-001",
+                    "Boîte orthopédie",
+                    PrioriteIntervention.URGENTE,
+                    "Bloc opératoire",
+                    "Orthopédie",
+                    List.of(
+                            unites.get(3).getId(),
+                            unites.get(4).getId(),
+                            unites.get(5).getId()
+                    )
+            );
+
+        } catch (IllegalArgumentException ignored) {
         }
     }
 }
