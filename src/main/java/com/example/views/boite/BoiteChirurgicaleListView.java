@@ -2,9 +2,11 @@ package com.example.views.boite;
 
 import com.example.entity.BoiteChirurgicale;
 import com.example.entity.BoiteMateriel;
+import com.example.entity.MouvementBoite;
 import com.example.entity.UniteMateriel;
 import com.example.entity.enums.PrioriteIntervention;
 import com.example.service.BoiteChirurgicaleService;
+import com.example.service.MouvementBoiteService;
 import com.example.service.UniteMaterielService;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
@@ -29,16 +31,19 @@ public class BoiteChirurgicaleListView extends VerticalLayout {
 
     private final BoiteChirurgicaleService boiteService;
     private final UniteMaterielService uniteMaterielService;
+    private final MouvementBoiteService mouvementBoiteService;
 
     private final TextField searchField;
     private final Grid<BoiteChirurgicale> boiteGrid;
 
     public BoiteChirurgicaleListView(
             BoiteChirurgicaleService boiteService,
-            UniteMaterielService uniteMaterielService
+            UniteMaterielService uniteMaterielService,
+            MouvementBoiteService mouvementBoiteService
     ) {
         this.boiteService = boiteService;
         this.uniteMaterielService = uniteMaterielService;
+        this.mouvementBoiteService = mouvementBoiteService;
 
         searchField = new TextField();
         searchField.setPlaceholder("Rechercher par code, nom, priorité, département ou spécialité");
@@ -93,11 +98,14 @@ public class BoiteChirurgicaleListView extends VerticalLayout {
             Button supprimerBtn = new Button("Supprimer");
             supprimerBtn.addClickListener(event -> openDeleteDialog(boite));
 
-            HorizontalLayout actions = new HorizontalLayout(voirBtn, modifierBtn, supprimerBtn);
+            Button mouvementsBtn = new Button("Mouvements");
+            mouvementsBtn.addClickListener(event -> openMouvementsDialog(boite));
+
+            HorizontalLayout actions = new HorizontalLayout(voirBtn, mouvementsBtn, modifierBtn, supprimerBtn);
             actions.setWrap(false);
 
             return actions;
-        }).setHeader("Actions").setWidth("330px").setFlexGrow(0);
+        }).setHeader("Actions").setWidth("450px").setFlexGrow(0);
 
         boiteGrid.setEmptyStateText("Aucune boîte chirurgicale enregistrée");
         boiteGrid.setSizeFull();
@@ -340,6 +348,46 @@ public class BoiteChirurgicaleListView extends VerticalLayout {
                 new HorizontalLayout(confirmBtn, cancelBtn)
         );
 
+        dialog.add(layout);
+        dialog.open();
+    }
+
+    private void openMouvementsDialog(BoiteChirurgicale boite) {
+        Dialog dialog = new Dialog();
+        dialog.setHeaderTitle("Mouvements de la boîte : " + boite.getCodeBoite());
+
+        Grid<MouvementBoite> mouvementGrid = new Grid<>();
+
+        mouvementGrid.addColumn(MouvementBoite::getDateMouvement)
+                .setHeader("Date")
+                .setSortable(true);
+
+        mouvementGrid.addColumn(MouvementBoite::getAncienneZone)
+                .setHeader("Ancienne zone")
+                .setSortable(true);
+
+        mouvementGrid.addColumn(MouvementBoite::getNouvelleZone)
+                .setHeader("Nouvelle zone")
+                .setSortable(true);
+
+        mouvementGrid.addColumn(MouvementBoite::getTypeMouvement)
+                .setHeader("Type")
+                .setSortable(true);
+
+        mouvementGrid.addColumn(MouvementBoite::getCommentaire)
+                .setHeader("Commentaire");
+
+        mouvementGrid.setItems(mouvementBoiteService.findByBoite(boite.getId()));
+        mouvementGrid.setEmptyStateText("Aucun mouvement pour cette boîte");
+        mouvementGrid.setSizeFull();
+
+        Button closeBtn = new Button("Fermer", event -> dialog.close());
+
+        VerticalLayout layout = new VerticalLayout(mouvementGrid, closeBtn);
+        layout.setSizeFull();
+
+        dialog.setWidth("900px");
+        dialog.setHeight("600px");
         dialog.add(layout);
         dialog.open();
     }

@@ -25,11 +25,9 @@ public class Patient {
     @Column(name = "date_naissance", nullable = false)
     private LocalDate dateNaissance;
 
-    // Relation avec Intervention
     @OneToMany(mappedBy = "patient")
     private List<Intervention> interventions;
 
-    // Constructeurs
     public Patient() {}
 
     public Patient(String cnPatient, String nomPatient, String prenomPatient, LocalDate dateNaissance) {
@@ -39,7 +37,6 @@ public class Patient {
         this.dateNaissance = dateNaissance;
     }
 
-    // Getters & Setters
 
     public Long getId() {
         return id;

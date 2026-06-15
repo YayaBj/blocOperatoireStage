@@ -42,7 +42,7 @@ public class InterventionListView extends VerticalLayout {
     final ComboBox<Patient> patient;
     final ComboBox<Salle> salle;
     final MultiSelectComboBox<Personnel> personnels;
-    final MultiSelectComboBox<UniteMateriel> unitesMateriel;
+    final MultiSelectComboBox<BoiteChirurgicale> boites;
     final Button createBtn;
     final Grid<Intervention> interventionGrid;
 
@@ -83,10 +83,10 @@ public class InterventionListView extends VerticalLayout {
         personnels.setItems(personnelService.findAll());
         personnels.setItemLabelGenerator(p -> p.getMatricule() + " - " + p.getNomPersonnel() + " " + p.getPrenomPersonnel());
 
-        unitesMateriel = new MultiSelectComboBox<>();
-        unitesMateriel.setPlaceholder("Unités matériel stériles");
-        unitesMateriel.setItems(interventionService.findUnitesSteriles());
-        unitesMateriel.setItemLabelGenerator(u -> u.getCodeInventaire() + " - " + u.getMateriel().getNomMateriel());
+        boites = new MultiSelectComboBox<>();
+        boites.setPlaceholder("Boîtes chirurgicales disponibles");
+        boites.setItems(interventionService.findBoitesDisponibles());
+        boites.setItemLabelGenerator(b -> b.getCodeBoite() + " - " + b.getNom());
 
         createBtn = new Button("Créer intervention", _ -> openRoleDialog());
         createBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
@@ -152,7 +152,7 @@ public class InterventionListView extends VerticalLayout {
                 patient,
                 salle,
                 personnels,
-                unitesMateriel,
+                boites,
                 createBtn
         );
         line2.setWidthFull();
@@ -172,8 +172,8 @@ public class InterventionListView extends VerticalLayout {
                     patient.getValue().getId(),
                     salle.getValue().getId(),
                     personnelsAvecRoles,
-                    unitesMateriel.getValue().stream()
-                            .map(UniteMateriel::getId)
+                    boites.getValue().stream()
+                            .map(BoiteChirurgicale::getId)
                             .toList()
             );
 
@@ -182,7 +182,7 @@ public class InterventionListView extends VerticalLayout {
 
             clearForm();
             refreshGrid();
-            refreshUnitesDisponibles();
+            refreshBoitesDisponibles();
 
         } catch (IllegalArgumentException e) {
             Notification.show(e.getMessage(), 4000, Notification.Position.BOTTOM_END)
@@ -194,8 +194,8 @@ public class InterventionListView extends VerticalLayout {
         interventionGrid.setItems(interventionService.findAll());
     }
 
-    private void refreshUnitesDisponibles() {
-        unitesMateriel.setItems(interventionService.findUnitesSteriles());
+    private void refreshBoitesDisponibles() {
+        boites.setItems(interventionService.findBoitesDisponibles());
     }
 
     private void clearForm() {
@@ -206,7 +206,7 @@ public class InterventionListView extends VerticalLayout {
         patient.clear();
         salle.clear();
         personnels.clear();
-        unitesMateriel.clear();
+        boites.clear();
     }
 
     private void openRoleDialog() {
@@ -272,12 +272,12 @@ public class InterventionListView extends VerticalLayout {
         }
         personnels.setInvalid(false);
 
-        if (unitesMateriel.getValue().isEmpty()) {
-            unitesMateriel.setInvalid(true);
-            unitesMateriel.setErrorMessage("Au moins une unité de matériel est obligatoire");
+        if (boites.getValue().isEmpty()) {
+            boites.setInvalid(true);
+            boites.setErrorMessage("Au moins une boîte chirurgicale est obligatoire");
             return false;
         }
-        unitesMateriel.setInvalid(false);
+        boites.setInvalid(false);
 
         return true;
     }

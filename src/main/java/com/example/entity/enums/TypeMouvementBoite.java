@@ -1,0 +1,12 @@
+package com.example.entity.enums;
+
+public enum TypeMouvementBoite {
+    SORTIE_STOCK,
+    RETOUR_SALE,
+    TRANSFERT_STERILISATION,
+    PASSAGE_LAVAGE,
+    PASSAGE_CONDITIONNEMENT,
+    PASSAGE_AUTOCLAVE,
+    RETOUR_STOCK_STERILE,
+    MISE_QUARANTAINE
+}

@@ -3,9 +3,7 @@ package com.example.service;
 import com.example.entity.BoiteChirurgicale;
 import com.example.entity.DemandeSterilisation;
 import com.example.entity.Intervention;
-import com.example.entity.enums.PrioriteIntervention;
-import com.example.entity.enums.StatutBoite;
-import com.example.entity.enums.StatutDemandeSterilisation;
+import com.example.entity.enums.*;
 import com.example.repository.BoiteChirurgicaleRepository;
 import com.example.repository.DemandeSterilisationRepository;
 import com.example.repository.InterventionRepository;
@@ -23,12 +21,16 @@ public class DemandeSterilisationService {
     private final BoiteChirurgicaleRepository boiteRepository;
     private final InterventionRepository interventionRepository;
 
+    private final MouvementBoiteService mouvementBoiteService;
+
     public DemandeSterilisationService(DemandeSterilisationRepository demandeRepository,
                                        BoiteChirurgicaleRepository boiteRepository,
-                                       InterventionRepository interventionRepository) {
+                                       InterventionRepository interventionRepository,
+                                       MouvementBoiteService mouvementBoiteService) {
         this.demandeRepository = demandeRepository;
         this.boiteRepository = boiteRepository;
         this.interventionRepository = interventionRepository;
+        this.mouvementBoiteService = mouvementBoiteService;
     }
 
     @Transactional
@@ -79,6 +81,14 @@ public class DemandeSterilisationService {
         );
 
         demandeRepository.saveAndFlush(demande);
+        mouvementBoiteService.enregistrerMouvement(
+                boite.getId(),
+                null,
+                ZoneBoite.BLOC_OPERATOIRE,
+                ZoneBoite.STOCK_SALE,
+                TypeMouvementBoite.RETOUR_SALE,
+                "Demande de stérilisation créée après utilisation de la boîte"
+        );
     }
 
     @Transactional
@@ -90,6 +100,16 @@ public class DemandeSterilisationService {
         }
 
         demande.setStatut(StatutDemandeSterilisation.ENVOYEE);
+
+        mouvementBoiteService.enregistrerMouvement(
+                demande.getBoiteChirurgicale().getId(),
+                null,
+                ZoneBoite.STOCK_SALE,
+                ZoneBoite.STOCK_SALE,
+                TypeMouvementBoite.TRANSFERT_STERILISATION,
+                "Demande envoyée au service de stérilisation"
+        );
+
         demande.getBoiteChirurgicale().setStatut(StatutBoite.EN_STOCK_SALE);
 
         demandeRepository.saveAndFlush(demande);
@@ -104,6 +124,16 @@ public class DemandeSterilisationService {
         }
 
         demande.setStatut(StatutDemandeSterilisation.ACCEPTEE);
+
+        mouvementBoiteService.enregistrerMouvement(
+                demande.getBoiteChirurgicale().getId(),
+                null,
+                ZoneBoite.STOCK_SALE,
+                ZoneBoite.STOCK_SALE,
+                TypeMouvementBoite.TRANSFERT_STERILISATION,
+                "Demande acceptée par le service de stérilisation"
+        );
+
         demande.getBoiteChirurgicale().setStatut(StatutBoite.EN_STERILISATION);
 
         demandeRepository.saveAndFlush(demande);
@@ -119,6 +149,16 @@ public class DemandeSterilisationService {
 
         demande.setStatut(StatutDemandeSterilisation.REFUSEE);
 
+        mouvementBoiteService.enregistrerMouvement(
+                demande.getBoiteChirurgicale().getId(),
+                null,
+                ZoneBoite.STOCK_SALE,
+                ZoneBoite.QUARANTAINE,
+                TypeMouvementBoite.MISE_QUARANTAINE,
+                "Demande refusée, boîte mise en quarantaine"
+        );
+
+
         demandeRepository.saveAndFlush(demande);
     }
 
@@ -131,6 +171,15 @@ public class DemandeSterilisationService {
         }
 
         demande.setStatut(StatutDemandeSterilisation.ANNULEE);
+
+        mouvementBoiteService.enregistrerMouvement(
+                demande.getBoiteChirurgicale().getId(),
+                null,
+                ZoneBoite.STOCK_SALE,
+                ZoneBoite.BLOC_OPERATOIRE,
+                TypeMouvementBoite.SORTIE_STOCK,
+                "Demande annulée, retour de la boîte au bloc opératoire"
+        );
 
         demandeRepository.saveAndFlush(demande);
     }

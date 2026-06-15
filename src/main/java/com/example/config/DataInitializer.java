@@ -1,23 +1,14 @@
 package com.example.config;
 
-import com.example.entity.Patient;
-import com.example.entity.Personnel;
-import com.example.entity.Salle;
-import com.example.entity.enums.StatutSalle;
+import com.example.entity.*;
+import com.example.entity.enums.*;
 import com.example.repository.PatientRepository;
 import com.example.repository.PersonnelRepository;
 import com.example.repository.SalleRepository;
-import com.example.service.MaterielService;
+import com.example.service.*;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
-import com.example.entity.UniteMateriel;
-import com.example.entity.enums.PrioriteIntervention;
-import com.example.entity.enums.StatutMachine;
-import com.example.entity.enums.TypeMachine;
-import com.example.service.BoiteChirurgicaleService;
-import com.example.service.MachineService;
-import com.example.service.UniteMaterielService;
 
 import java.util.List;
 import java.time.LocalDate;
@@ -32,6 +23,9 @@ public class DataInitializer implements CommandLineRunner {
     private final BoiteChirurgicaleService boiteChirurgicaleService;
     private final MachineService machineService;
     private final UniteMaterielService uniteMaterielService;
+    private final DemandeSterilisationService demandeSterilisationService;
+    private final ProcessusSterilisationService processusSterilisationService;
+    private final IncidentSterilisationService incidentSterilisationService;
 
     public DataInitializer(PatientRepository patientRepository,
                            SalleRepository salleRepository,
@@ -39,7 +33,10 @@ public class DataInitializer implements CommandLineRunner {
                            MaterielService materielService,
                            BoiteChirurgicaleService boiteChirurgicaleService,
                            MachineService machineService,
-                           UniteMaterielService uniteMaterielService) {
+                           UniteMaterielService uniteMaterielService,
+                           DemandeSterilisationService demandeSterilisationService,
+                           ProcessusSterilisationService processusSterilisationService,
+                           IncidentSterilisationService incidentSterilisationService) {
         this.patientRepository = patientRepository;
         this.salleRepository = salleRepository;
         this.personnelRepository = personnelRepository;
@@ -47,6 +44,9 @@ public class DataInitializer implements CommandLineRunner {
         this.boiteChirurgicaleService = boiteChirurgicaleService;
         this.machineService = machineService;
         this.uniteMaterielService = uniteMaterielService;
+        this.demandeSterilisationService = demandeSterilisationService;
+        this.processusSterilisationService = processusSterilisationService;
+        this.incidentSterilisationService = incidentSterilisationService;
     }
 
     @Override
@@ -74,6 +74,7 @@ public class DataInitializer implements CommandLineRunner {
         createMaterielIfEmpty();
         createMachinesIfEmpty();
         createBoitesIfEmpty();
+        createDemoSterilisationScenarios();
     }
 
     private void createMaterielIfEmpty() {
@@ -83,7 +84,6 @@ public class DataInitializer implements CommandLineRunner {
             materielService.createMateriel("Respirateur", "Équipement médical", 3, 3, 1);
             materielService.createMateriel("Set de suture", "Consommable", 15, 15, 5);
         } catch (IllegalArgumentException ignored) {
-            // Le matériel existe déjà, donc on ne fait rien.
         }
     }
 
@@ -111,11 +111,7 @@ public class DataInitializer implements CommandLineRunner {
                     PrioriteIntervention.NORMALE,
                     "Bloc opératoire",
                     "Chirurgie générale",
-                    List.of(
-                            unites.get(0).getId(),
-                            unites.get(1).getId(),
-                            unites.get(2).getId()
-                    )
+                    List.of(unites.get(0).getId(), unites.get(1).getId(), unites.get(2).getId())
             );
 
             boiteChirurgicaleService.createBoite(
@@ -124,14 +120,130 @@ public class DataInitializer implements CommandLineRunner {
                     PrioriteIntervention.URGENTE,
                     "Bloc opératoire",
                     "Orthopédie",
-                    List.of(
-                            unites.get(3).getId(),
-                            unites.get(4).getId(),
-                            unites.get(5).getId()
-                    )
+                    List.of(unites.get(3).getId(), unites.get(4).getId(), unites.get(5).getId())
+            );
+
+            boiteChirurgicaleService.createBoite(
+                    "BOX-CARD-001",
+                    "Boîte cardiologie",
+                    PrioriteIntervention.URGENTE,
+                    "Bloc opératoire",
+                    "Cardiologie",
+                    List.of(unites.get(0).getId(), unites.get(3).getId())
+            );
+
+            boiteChirurgicaleService.createBoite(
+                    "BOX-NEUR-001",
+                    "Boîte neurochirurgie",
+                    PrioriteIntervention.URGENTE,
+                    "Bloc opératoire",
+                    "Neurochirurgie",
+                    List.of(unites.get(1).getId(), unites.get(4).getId())
+            );
+
+            boiteChirurgicaleService.createBoite(
+                    "BOX-UROL-001",
+                    "Boîte urologie",
+                    PrioriteIntervention.NORMALE,
+                    "Bloc opératoire",
+                    "Urologie",
+                    List.of(unites.get(2).getId(), unites.get(5).getId())
             );
 
         } catch (IllegalArgumentException ignored) {
+        }
+    }
+
+    private void createDemoSterilisationScenarios() {
+        try {
+            List<BoiteChirurgicale> boites = boiteChirurgicaleService.findAll();
+            List<Machine> machines = machineService.findAll();
+
+            if (boites.size() < 2 || machines.size() < 2) {
+                return;
+            }
+
+            Machine laveur = machines.stream()
+                    .filter(m -> m.getTypeMachine() == TypeMachine.LAVAGE)
+                    .findFirst()
+                    .orElse(null);
+
+            Machine autoclave = machines.stream()
+                    .filter(m -> m.getTypeMachine() == TypeMachine.STERILISATION)
+                    .findFirst()
+                    .orElse(null);
+
+            if (laveur == null || autoclave == null) {
+                return;
+            }
+
+            BoiteChirurgicale boiteRefusee = boites.get(0);
+            BoiteChirurgicale boiteEchec = boites.get(1);
+
+            demandeSterilisationService.createDemande(
+                    "DEM-REFUS-001",
+                    LocalDate.now().plusDays(1),
+                    PrioriteIntervention.NORMALE,
+                    boiteRefusee.getId(),
+                    null,
+                    "Demande de démonstration : refusée par le service de stérilisation"
+            );
+
+            DemandeSterilisation demandeRefusee = demandeSterilisationService.findAll().stream()
+                    .filter(d -> d.getCodeDemande().equals("DEM-REFUS-001"))
+                    .findFirst()
+                    .orElseThrow();
+
+            demandeSterilisationService.envoyerDemande(demandeRefusee.getId());
+            demandeSterilisationService.refuserDemande(demandeRefusee.getId());
+
+
+            demandeSterilisationService.createDemande(
+                    "DEM-ECHEC-001",
+                    LocalDate.now().plusDays(1),
+                    PrioriteIntervention.URGENTE,
+                    boiteEchec.getId(),
+                    null,
+                    "Demande de démonstration : cycle avec incident"
+            );
+
+            DemandeSterilisation demandeEchec = demandeSterilisationService.findAll().stream()
+                    .filter(d -> d.getCodeDemande().equals("DEM-ECHEC-001"))
+                    .findFirst()
+                    .orElseThrow();
+
+            demandeSterilisationService.envoyerDemande(demandeEchec.getId());
+            demandeSterilisationService.accepterDemande(demandeEchec.getId());
+
+            processusSterilisationService.creerProcessus(
+                    demandeEchec.getId(),
+                    laveur.getId(),
+                    autoclave.getId(),
+                    "Processus de démonstration avec incident"
+            );
+
+            ProcessusSterilisation processus = processusSterilisationService.findAll().stream()
+                    .filter(p -> p.getDemandeSterilisation().getCodeDemande().equals("DEM-ECHEC-001"))
+                    .findFirst()
+                    .orElseThrow();
+
+            processusSterilisationService.avancerProcessus(processus.getId()); // LAVAGE
+            processusSterilisationService.avancerProcessus(processus.getId()); // CONDITIONNEMENT
+
+            incidentSterilisationService.createIncident(
+                    processus.getId(),
+                    autoclave.getId(),
+                    TypeIncidentSterilisation.EMBALLAGE_DECHIRE,
+                    GraviteIncident.CRITIQUE,
+                    "Emballage déchiré détecté avant passage à l'autoclave"
+            );
+
+            processusSterilisationService.mettreEnEchec(
+                    processus.getId(),
+                    "Échec du processus : emballage déchiré"
+            );
+
+        } catch (Exception ignored) {
         }
     }
 }

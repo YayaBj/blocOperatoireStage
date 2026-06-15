@@ -15,17 +15,14 @@ public class AffectationPersonnel {
     @Column(name = "role_dans_intervention", nullable = false)
     private RoleIntervention roleDansIntervention;
 
-    // Relation avec Intervention
     @ManyToOne
     @JoinColumn(name = "intervention_id", nullable = false)
     private Intervention intervention;
 
-    // Relation avec Personnel
     @ManyToOne
     @JoinColumn(name = "personnel_id", nullable = false)
     private Personnel personnel;
 
-    // Constructeurs
     public AffectationPersonnel() {}
 
     public AffectationPersonnel(RoleIntervention roleDansIntervention,
@@ -36,7 +33,6 @@ public class AffectationPersonnel {
         this.personnel = personnel;
     }
 
-    // Getters & Setters
 
     public Long getId() {
         return id;

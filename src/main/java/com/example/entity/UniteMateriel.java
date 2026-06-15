@@ -28,9 +28,6 @@ public class UniteMateriel {
     @OneToMany(mappedBy = "uniteMateriel")
     private List<InterventionMateriel> interventionMateriels = new ArrayList<>();
 
-    @OneToMany(mappedBy = "uniteMateriel")
-    private List<Sterilisation> sterilisations = new ArrayList<>();
-
     public UniteMateriel() {}
 
     public UniteMateriel(String codeInventaire, EtatMateriel etat, Materiel materiel) {
@@ -39,7 +36,6 @@ public class UniteMateriel {
         this.materiel = materiel;
     }
 
-    // getters / setters
 
     public Long getId() {
         return id;
@@ -79,13 +75,5 @@ public class UniteMateriel {
 
     public void setInterventionMateriels(List<InterventionMateriel> interventionMateriels) {
         this.interventionMateriels = interventionMateriels;
-    }
-
-    public List<Sterilisation> getSterilisations() {
-        return sterilisations;
-    }
-
-    public void setSterilisations(List<Sterilisation> sterilisations) {
-        this.sterilisations = sterilisations;
     }
 }

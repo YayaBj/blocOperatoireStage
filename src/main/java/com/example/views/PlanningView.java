@@ -248,10 +248,10 @@ public class PlanningView extends VerticalLayout {
                 p.getMatricule() + " - " + p.getNomPersonnel() + " " + p.getPrenomPersonnel()
         );
 
-        MultiSelectComboBox<UniteMateriel> unitesMateriel = new MultiSelectComboBox<>("Unités matériel");
-        unitesMateriel.setItems(interventionService.findUnitesSteriles());
-        unitesMateriel.setItemLabelGenerator(u ->
-                u.getCodeInventaire() + " - " + u.getMateriel().getNomMateriel()
+        MultiSelectComboBox<BoiteChirurgicale> boites = new MultiSelectComboBox<>("Boîtes chirurgicales");
+        boites.setItems(interventionService.findBoitesDisponibles());
+        boites.setItemLabelGenerator(b ->
+                b.getCodeBoite() + " - " + b.getNom()
         );
 
         Button createBtn = new Button("Créer", event -> {
@@ -262,7 +262,7 @@ public class PlanningView extends VerticalLayout {
                     || patient.getValue() == null
                     || salle.getValue() == null
                     || personnels.getValue().isEmpty()
-                    || unitesMateriel.getValue().isEmpty()) {
+                    || boites.getValue().isEmpty()) {
 
                 Notification.show("Veuillez remplir tous les champs", 3000, Notification.Position.BOTTOM_END)
                         .addThemeVariants(NotificationVariant.LUMO_ERROR);
@@ -279,11 +279,11 @@ public class PlanningView extends VerticalLayout {
                     patient.getValue(),
                     salle.getValue(),
                     personnels,
-                    unitesMateriel
+                    boites
             );
         });
 
-        Button cancelBtn = new Button("Annuler", event -> dialog.close());
+        Button cancelBtn = new Button("Annuler", _ -> dialog.close());
 
         HorizontalLayout actions = new HorizontalLayout(createBtn, cancelBtn);
 
@@ -294,7 +294,7 @@ public class PlanningView extends VerticalLayout {
                 patient,
                 salle,
                 personnels,
-                unitesMateriel,
+                boites,
                 actions
         );
 
@@ -314,7 +314,7 @@ public class PlanningView extends VerticalLayout {
             Patient patient,
             Salle salle,
             MultiSelectComboBox<Personnel> personnels,
-            MultiSelectComboBox<UniteMateriel> unitesMateriel
+            MultiSelectComboBox<BoiteChirurgicale> boites
     ) {
         RolePersonnelDialog roleDialog = new RolePersonnelDialog(
                 personnels.getValue(),
@@ -328,8 +328,8 @@ public class PlanningView extends VerticalLayout {
                                 patient.getId(),
                                 salle.getId(),
                                 personnelsAvecRoles,
-                                unitesMateriel.getValue().stream()
-                                        .map(UniteMateriel::getId)
+                                boites.getValue().stream()
+                                        .map(BoiteChirurgicale::getId)
                                         .toList()
                         );
 
@@ -452,7 +452,11 @@ public class PlanningView extends VerticalLayout {
             actions.add(terminerBtn);
         }
 
-        actions.add(annulerBtn, supprimerBtn, fermerBtn);
+        if (intervention.getStatutIntervention() != StatutIntervention.ANNULEE) {
+            actions.add(annulerBtn);
+        }
+
+        actions.add(supprimerBtn, fermerBtn);
 
         return actions;
     }

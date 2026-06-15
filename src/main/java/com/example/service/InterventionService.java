@@ -15,32 +15,35 @@ import java.util.Map;
 @Service
 public class InterventionService {
 
+    private final DemandeSterilisationService demandeSterilisationService;
+
     private final InterventionRepository interventionRepository;
     private final PatientRepository patientRepository;
     private final SalleRepository salleRepository;
     private final PersonnelRepository personnelRepository;
-    private final UniteMaterielRepository uniteMaterielRepository;
     private final AffectationPersonnelRepository affectationPersonnelRepository;
-    private final InterventionMaterielRepository interventionMaterielRepository;
-    private final SterilisationRepository sterilisationRepository;
+    private final BoiteChirurgicaleRepository boiteChirurgicaleRepository;
+    private final InterventionBoiteRepository interventionBoiteRepository;
+
+
 
     public InterventionService(
+            DemandeSterilisationService demandeSterilisationService,
             InterventionRepository interventionRepository,
             PatientRepository patientRepository,
             SalleRepository salleRepository,
             PersonnelRepository personnelRepository,
-            UniteMaterielRepository uniteMaterielRepository,
             AffectationPersonnelRepository affectationPersonnelRepository,
-            InterventionMaterielRepository interventionMaterielRepository,
-            SterilisationRepository sterilisationRepository) {
+            BoiteChirurgicaleRepository boiteChirurgicaleRepository,
+            InterventionBoiteRepository interventionBoiteRepository) {
+        this.demandeSterilisationService = demandeSterilisationService;
         this.interventionRepository = interventionRepository;
         this.patientRepository = patientRepository;
         this.salleRepository = salleRepository;
         this.personnelRepository = personnelRepository;
-        this.uniteMaterielRepository = uniteMaterielRepository;
         this.affectationPersonnelRepository = affectationPersonnelRepository;
-        this.interventionMaterielRepository = interventionMaterielRepository;
-        this.sterilisationRepository = sterilisationRepository;
+        this.boiteChirurgicaleRepository = boiteChirurgicaleRepository;
+        this.interventionBoiteRepository = interventionBoiteRepository;
     }
 
     @Transactional
@@ -52,7 +55,7 @@ public class InterventionService {
             Long patientId,
             Long salleId,
             Map<Long, RoleIntervention> personnelsAvecRoles,
-            List<Long> uniteMaterielIds
+            List<Long> boiteIds
     ) {
         if (typeIntervention == null || typeIntervention.isBlank()) {
             throw new IllegalArgumentException("Le type d’intervention est obligatoire");
@@ -85,7 +88,7 @@ public class InterventionService {
         verifierDisponibilitePatient(patientId, dateHeureDebut, dateHeureFin);
         verifierDisponibiliteSalle(salleId, dateHeureDebut, dateHeureFin);
         verifierDisponibilitePersonnel(personnelsAvecRoles, dateHeureDebut, dateHeureFin);
-        verifierDisponibiliteMateriel(uniteMaterielIds, dateHeureDebut, dateHeureFin);
+        verifierDisponibiliteBoites(boiteIds, dateHeureDebut, dateHeureFin);
 
         Intervention intervention = new Intervention(
                 typeIntervention.trim(),
@@ -112,18 +115,19 @@ public class InterventionService {
             affectationPersonnelRepository.save(affectation);
         }
 
-        List<UniteMateriel> unites = uniteMaterielRepository.findAllById(uniteMaterielIds);
+        List<BoiteChirurgicale> boites = boiteChirurgicaleRepository.findAllById(boiteIds);
 
-        if (unites.size() != uniteMaterielIds.size()) {
-            throw new IllegalArgumentException("Une ou plusieurs unités de matériel sont introuvables");
+        if (boites.size() != boiteIds.size()) {
+            throw new IllegalArgumentException("Une ou plusieurs boîtes sont introuvables");
         }
 
-        for (UniteMateriel unite : unites) {
-            InterventionMateriel interventionMateriel = new InterventionMateriel(intervention, unite);
-            unite.setEtat(EtatMateriel.RESERVE);
-            decrementerStockDisponible(unite);
-            uniteMaterielRepository.save(unite);
-            interventionMaterielRepository.save(interventionMateriel);
+        for (BoiteChirurgicale boite : boites) {
+            InterventionBoite interventionBoite = new InterventionBoite(intervention, boite);
+
+            boite.setStatut(StatutBoite.EN_STOCK_SALE);
+
+            interventionBoiteRepository.save(interventionBoite);
+            boiteChirurgicaleRepository.save(boite);
         }
     }
 
@@ -135,28 +139,42 @@ public class InterventionService {
         if (intervention.getStatutIntervention() == StatutIntervention.TERMINEE) {
             throw new IllegalArgumentException("Cette intervention est déjà terminée");
         }
+
         if (intervention.getStatutIntervention() == StatutIntervention.ANNULEE) {
             throw new IllegalArgumentException("Impossible de terminer une intervention annulée");
         }
 
         intervention.setStatutIntervention(StatutIntervention.TERMINEE);
 
-        List<InterventionMateriel> materielsUtilises =
-                interventionMaterielRepository.findByInterventionId(interventionId);
+        List<InterventionBoite> boites =
+                interventionBoiteRepository.findByInterventionId(interventionId);
 
-        for (InterventionMateriel interventionMateriel : materielsUtilises) {
-            UniteMateriel unite = interventionMateriel.getUniteMateriel();
+        for (InterventionBoite interventionBoite : boites) {
+            BoiteChirurgicale boite = interventionBoite.getBoiteChirurgicale();
 
-            unite.setEtat(EtatMateriel.EN_STERILISATION);
+            boite.setStatut(StatutBoite.EN_STOCK_SALE);
 
-            Sterilisation sterilisation = new Sterilisation(
-                    LocalDate.now(),
-                    StatutSterilisation.EN_ATTENTE_COLLECTE,
-                    unite
+            boite.getMateriels().forEach(boiteMateriel ->
+                    boiteMateriel.getUniteMateriel().setEtat(EtatMateriel.EN_STERILISATION)
             );
 
-            sterilisationRepository.save(sterilisation);
-            uniteMaterielRepository.save(unite);
+            boiteChirurgicaleRepository.save(boite);
+
+            demandeSterilisationService.createDemande(
+                    "DS-" + intervention.getId() + "-" + boite.getId(),
+                    LocalDate.now(),
+                    intervention.getPriorite(),
+                    boite.getId(),
+                    intervention.getId(),
+                    "Demande générée automatiquement après intervention"
+            );
+
+            DemandeSterilisation demande = demandeSterilisationService.findAll().stream()
+                    .filter(d -> d.getCodeDemande().equals("DS-" + intervention.getId() + "-" + boite.getId()))
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalArgumentException("Demande de stérilisation introuvable"));
+
+            demandeSterilisationService.envoyerDemande(demande.getId());
         }
 
         interventionRepository.saveAndFlush(intervention);
@@ -224,46 +242,46 @@ public class InterventionService {
         }
     }
 
-    private void verifierDisponibiliteMateriel(
-            List<Long> uniteMaterielIds,
+    private void verifierDisponibiliteBoites(
+            List<Long> boiteIds,
             LocalDateTime debut,
             LocalDateTime fin
     ) {
-        if (uniteMaterielIds == null || uniteMaterielIds.isEmpty()) {
-            throw new IllegalArgumentException("Au moins une unité de matériel doit être sélectionnée");
+        if (boiteIds == null || boiteIds.isEmpty()) {
+            throw new IllegalArgumentException("Au moins une boîte chirurgicale doit être sélectionnée");
         }
 
-        List<Long> idsDistincts = uniteMaterielIds.stream().distinct().toList();
+        List<Long> idsDistincts = boiteIds.stream().distinct().toList();
 
-        if (idsDistincts.size() != uniteMaterielIds.size()) {
-            throw new IllegalArgumentException("Une unité de matériel est sélectionnée plusieurs fois");
+        if (idsDistincts.size() != boiteIds.size()) {
+            throw new IllegalArgumentException("Une boîte chirurgicale est sélectionnée plusieurs fois");
         }
 
-        List<UniteMateriel> unites = uniteMaterielRepository.findAllById(uniteMaterielIds);
+        List<BoiteChirurgicale> boites = boiteChirurgicaleRepository.findAllById(boiteIds);
 
-        if (unites.size() != uniteMaterielIds.size()) {
-            throw new IllegalArgumentException("Une ou plusieurs unités de matériel sont introuvables");
+        if (boites.size() != boiteIds.size()) {
+            throw new IllegalArgumentException("Une ou plusieurs boîtes sont introuvables");
         }
 
-        for (UniteMateriel unite : unites) {
-            if (unite.getEtat() != EtatMateriel.STERILE) {
+        for (BoiteChirurgicale boite : boites) {
+            if (boite.getStatut() != StatutBoite.EN_STOCK_STERILE && boite.getStatut() != StatutBoite.ACTIVE) {
                 throw new IllegalArgumentException(
-                        "L’unité " + unite.getCodeInventaire() + " n’est pas stérile"
+                        "La boîte " + boite.getCodeBoite() + " n’est pas disponible"
                 );
             }
         }
 
-        List<InterventionMateriel> materielsUtilises =
-                interventionMaterielRepository.findByUniteMaterielIdInAndInterventionStatutInterventionIn(
-                        uniteMaterielIds,
+        List<InterventionBoite> boitesUtilisees =
+                interventionBoiteRepository.findByBoiteChirurgicaleIdInAndInterventionStatutInterventionIn(
+                        boiteIds,
                         statutsBloquants()
                 );
 
-        boolean conflit = materielsUtilises.stream()
-                .anyMatch(interventionMateriel -> chevauche(debut, fin, interventionMateriel.getIntervention()));
+        boolean conflit = boitesUtilisees.stream()
+                .anyMatch(interventionBoite -> chevauche(debut, fin, interventionBoite.getIntervention()));
 
         if (conflit) {
-            throw new IllegalArgumentException("Une unité de matériel est déjà réservée sur ce créneau");
+            throw new IllegalArgumentException("Une boîte chirurgicale est déjà réservée sur ce créneau");
         }
     }
 
@@ -294,8 +312,13 @@ public class InterventionService {
     }
 
     @Transactional(readOnly = true)
-    public List<UniteMateriel> findUnitesSteriles() {
-        return uniteMaterielRepository.findByEtat(EtatMateriel.STERILE);
+    public List<BoiteChirurgicale> findBoitesDisponibles() {
+        return boiteChirurgicaleRepository.findAll().stream()
+                .filter(boite ->
+                        boite.getStatut() == StatutBoite.EN_STOCK_STERILE
+                                || boite.getStatut() == StatutBoite.ACTIVE
+                )
+                .toList();
     }
 
     @Transactional(readOnly = true)
@@ -309,20 +332,23 @@ public class InterventionService {
     public void annulerIntervention(Long id) {
         Intervention intervention = findById(id);
 
-        List<InterventionMateriel> materielsIntervention =
-                interventionMaterielRepository.findByInterventionId(id);
+        if (intervention.getStatutIntervention() == StatutIntervention.TERMINEE) {
+            throw new IllegalArgumentException("Impossible d’annuler une intervention terminée");
+        }
 
-        for (InterventionMateriel im : materielsIntervention) {
-            UniteMateriel unite = im.getUniteMateriel();
+        List<InterventionBoite> boitesIntervention =
+                interventionBoiteRepository.findByInterventionId(id);
 
-            unite.setEtat(EtatMateriel.STERILE);
+        for (InterventionBoite interventionBoite : boitesIntervention) {
+            BoiteChirurgicale boite = interventionBoite.getBoiteChirurgicale();
 
-            Materiel materiel = unite.getMateriel();
-            if (materiel != null && materiel.getStock() != null) {
-                materiel.getStock().setQuantiteDisponible(materiel.getStock().getQuantiteDisponible() + 1);
-            }
+            boite.setStatut(StatutBoite.EN_STOCK_STERILE);
 
-            uniteMaterielRepository.save(unite);
+            boite.getMateriels().forEach(boiteMateriel ->
+                    boiteMateriel.getUniteMateriel().setEtat(EtatMateriel.STERILE)
+            );
+
+            boiteChirurgicaleRepository.save(boite);
         }
 
         intervention.setStatutIntervention(StatutIntervention.ANNULEE);
@@ -338,10 +364,8 @@ public class InterventionService {
 
     @Transactional
     public void demarrerIntervention(Long interventionId) {
-
         Intervention intervention = interventionRepository.findById(interventionId)
-                .orElseThrow(() ->
-                        new IllegalArgumentException("Intervention introuvable"));
+                .orElseThrow(() -> new IllegalArgumentException("Intervention introuvable"));
 
         if (intervention.getStatutIntervention() == StatutIntervention.ANNULEE) {
             throw new IllegalArgumentException("Impossible de démarrer une intervention annulée");
@@ -357,14 +381,18 @@ public class InterventionService {
 
         intervention.setStatutIntervention(StatutIntervention.EN_COURS);
 
+        List<InterventionBoite> boites =
+                interventionBoiteRepository.findByInterventionId(interventionId);
 
-        List<InterventionMateriel> materiels =
-                interventionMaterielRepository.findByInterventionId(interventionId);
+        for (InterventionBoite interventionBoite : boites) {
+            BoiteChirurgicale boite = interventionBoite.getBoiteChirurgicale();
+            boite.setStatut(StatutBoite.EN_STOCK_SALE);
 
-        for (InterventionMateriel interventionMateriel : materiels) {
-            UniteMateriel unite = interventionMateriel.getUniteMateriel();
-            unite.setEtat(EtatMateriel.EN_UTILISATION);
-            uniteMaterielRepository.save(unite);
+            boite.getMateriels().forEach(boiteMateriel ->
+                    boiteMateriel.getUniteMateriel().setEtat(EtatMateriel.EN_UTILISATION)
+            );
+
+            boiteChirurgicaleRepository.save(boite);
         }
 
         interventionRepository.saveAndFlush(intervention);
@@ -399,7 +427,7 @@ public class InterventionService {
                 nouvelleFin
         );
 
-        verifierDisponibiliteMaterielUpdate(
+        verifierDisponibiliteBoitesUpdate(
                 interventionId,
                 nouveauDebut,
                 nouvelleFin
@@ -505,34 +533,34 @@ public class InterventionService {
         }
     }
 
-    private void verifierDisponibiliteMaterielUpdate(
+    private void verifierDisponibiliteBoitesUpdate(
             Long interventionId,
             LocalDateTime debut,
             LocalDateTime fin
     ) {
-        List<InterventionMateriel> materielsIntervention =
-                interventionMaterielRepository.findByInterventionId(interventionId);
+        List<InterventionBoite> boitesIntervention =
+                interventionBoiteRepository.findByInterventionId(interventionId);
 
-        List<Long> uniteIds = materielsIntervention.stream()
-                .map(interventionMateriel -> interventionMateriel.getUniteMateriel().getId())
+        List<Long> boiteIds = boitesIntervention.stream()
+                .map(interventionBoite -> interventionBoite.getBoiteChirurgicale().getId())
                 .toList();
 
-        if (uniteIds.isEmpty()) {
+        if (boiteIds.isEmpty()) {
             return;
         }
 
-        List<InterventionMateriel> materielsUtilises =
-                interventionMaterielRepository.findByUniteMaterielIdInAndInterventionStatutInterventionIn(
-                        uniteIds,
+        List<InterventionBoite> boitesUtilisees =
+                interventionBoiteRepository.findByBoiteChirurgicaleIdInAndInterventionStatutInterventionIn(
+                        boiteIds,
                         statutsBloquants()
                 );
 
-        boolean conflit = materielsUtilises.stream()
-                .filter(interventionMateriel -> !interventionMateriel.getIntervention().getId().equals(interventionId))
-                .anyMatch(interventionMateriel -> chevauche(debut, fin, interventionMateriel.getIntervention()));
+        boolean conflit = boitesUtilisees.stream()
+                .filter(interventionBoite -> !interventionBoite.getIntervention().getId().equals(interventionId))
+                .anyMatch(interventionBoite -> chevauche(debut, fin, interventionBoite.getIntervention()));
 
         if (conflit) {
-            throw new IllegalArgumentException("Une unité de matériel est déjà réservée sur ce créneau");
+            throw new IllegalArgumentException("Une boîte chirurgicale est déjà réservée sur ce créneau");
         }
     }
 

@@ -8,4 +8,11 @@ import java.util.List;
 public interface BoiteMaterielRepository extends JpaRepository<BoiteMateriel, Long> {
 
     List<BoiteMateriel> findByBoiteChirurgicaleId(Long boiteId);
+
+    boolean existsByUniteMaterielId(Long uniteId);
+
+    boolean existsByUniteMaterielIdAndBoiteChirurgicaleIdNot(
+            Long uniteId,
+            Long boiteId
+    );
 }

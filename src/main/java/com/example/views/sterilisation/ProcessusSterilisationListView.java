@@ -1,14 +1,8 @@
 package com.example.views.sterilisation;
 
-import com.example.entity.DemandeSterilisation;
-import com.example.entity.Machine;
-import com.example.entity.ProcessusSterilisation;
-import com.example.entity.enums.StatutDemandeSterilisation;
-import com.example.entity.enums.StatutProcessusSterilisation;
-import com.example.entity.enums.TypeMachine;
-import com.example.service.DemandeSterilisationService;
-import com.example.service.MachineService;
-import com.example.service.ProcessusSterilisationService;
+import com.example.entity.*;
+import com.example.entity.enums.*;
+import com.example.service.*;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.combobox.ComboBox;
@@ -33,16 +27,22 @@ public class ProcessusSterilisationListView extends VerticalLayout {
     private final ProcessusSterilisationService processusService;
     private final DemandeSterilisationService demandeService;
     private final MachineService machineService;
+    private final HistoriqueProcessusService historiqueService;
+    private final IncidentSterilisationService incidentService;
 
     private final TextField searchField;
     private final Grid<ProcessusSterilisation> processusGrid;
 
     public ProcessusSterilisationListView(ProcessusSterilisationService processusService,
                                           DemandeSterilisationService demandeService,
-                                          MachineService machineService) {
+                                          MachineService machineService,
+                                          HistoriqueProcessusService historiqueService,
+                                          IncidentSterilisationService incidentService) {
         this.processusService = processusService;
         this.demandeService = demandeService;
         this.machineService = machineService;
+        this.historiqueService = historiqueService;
+        this.incidentService = incidentService;
 
         searchField = new TextField();
         searchField.setPlaceholder("Rechercher par demande, boîte, statut ou machine");
@@ -89,26 +89,54 @@ public class ProcessusSterilisationListView extends VerticalLayout {
 
         processusGrid.addComponentColumn(processus -> {
             if (processus.getStatut() == StatutProcessusSterilisation.TERMINE) {
-                return new Span("Terminé");
+                Button historiqueBtn = new Button("Historique");
+                historiqueBtn.addClickListener(_ -> openHistoriqueDialog(processus));
+
+                return new HorizontalLayout(
+                        new Span("Terminé"),
+                        historiqueBtn
+                );
             }
 
             if (processus.getStatut() == StatutProcessusSterilisation.ECHEC) {
-                return new Span("Échec");
+                Button historiqueBtn = new Button("Historique");
+                historiqueBtn.addClickListener(event -> openHistoriqueDialog(processus));
+
+                Button incidentsBtn = new Button("Voir incident");
+                incidentsBtn.addThemeVariants(ButtonVariant.LUMO_ERROR);
+                incidentsBtn.addClickListener(event -> openIncidentsDialog(processus));
+
+                HorizontalLayout actions = new HorizontalLayout(
+                        new Span("Échec"),
+                        historiqueBtn,
+                        incidentsBtn
+                );
+                actions.setWrap(false);
+
+                return actions;
             }
 
             Button nextBtn = new Button("Passer à : " + getNextStatutLabel(processus.getStatut()));
-            nextBtn.addClickListener(event -> executeAction(
+            nextBtn.addClickListener(_ -> executeAction(
                     () -> processusService.avancerProcessus(processus.getId())
             ));
 
-            Button echecBtn = new Button("Échec", event -> openEchecDialog(processus));
+            Button echecBtn = new Button("Échec", _ -> openEchecDialog(processus));
             echecBtn.addThemeVariants(ButtonVariant.LUMO_ERROR);
 
-            HorizontalLayout actions = new HorizontalLayout(nextBtn, echecBtn);
+            Button historiqueBtn = new Button("Historique");
+            historiqueBtn.addClickListener(_ ->
+                    openHistoriqueDialog(processus)
+            );
+
+            Button incidentsBtn = new Button("Incidents");
+            incidentsBtn.addClickListener(_ -> openIncidentsDialog(processus));
+
+            HorizontalLayout actions = new HorizontalLayout(nextBtn, echecBtn, historiqueBtn, incidentsBtn);
             actions.setWrap(false);
 
             return actions;
-        }).setHeader("Actions").setWidth("360px").setFlexGrow(0);
+        }).setHeader("Actions").setWidth("520px").setFlexGrow(0);
 
         processusGrid.setEmptyStateText("Aucun processus de stérilisation");
         processusGrid.setSizeFull();
@@ -185,16 +213,45 @@ public class ProcessusSterilisationListView extends VerticalLayout {
 
     private void openEchecDialog(ProcessusSterilisation processus) {
         Dialog dialog = new Dialog();
-        dialog.setHeaderTitle("Déclarer un échec");
+        dialog.setHeaderTitle("Déclarer un incident / échec");
 
-        TextArea commentaire = new TextArea("Motif de l’échec");
-        commentaire.setWidthFull();
+        ComboBox<TypeIncidentSterilisation> typeIncident = new ComboBox<>("Type incident");
+        typeIncident.setItems(TypeIncidentSterilisation.values());
 
-        Button confirmBtn = new Button("Confirmer échec", event -> {
+        ComboBox<GraviteIncident> gravite = new ComboBox<>("Gravité");
+        gravite.setItems(GraviteIncident.values());
+
+        ComboBox<Machine> machine = new ComboBox<>("Machine concernée");
+        machine.setItems(
+                processus.getMachineLavage(),
+                processus.getMachineAutoclave()
+        );
+        machine.setItemLabelGenerator(m -> m == null ? "" : m.getNom());
+        machine.setClearButtonVisible(true);
+
+        TextArea description = new TextArea("Description");
+        description.setWidthFull();
+
+        Button confirmBtn = new Button("Déclarer l’échec", event -> {
             try {
-                processusService.mettreEnEchec(processus.getId(), commentaire.getValue());
+                Long machineId = machine.getValue() == null
+                        ? null
+                        : machine.getValue().getId();
 
-                Notification.show("Processus marqué en échec", 3000, Notification.Position.BOTTOM_END)
+                incidentService.createIncident(
+                        processus.getId(),
+                        machineId,
+                        typeIncident.getValue(),
+                        gravite.getValue(),
+                        description.getValue()
+                );
+
+                processusService.mettreEnEchec(
+                        processus.getId(),
+                        description.getValue()
+                );
+
+                Notification.show("Incident enregistré et processus marqué en échec", 3000, Notification.Position.BOTTOM_END)
                         .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
 
                 refreshGrid();
@@ -205,16 +262,20 @@ public class ProcessusSterilisationListView extends VerticalLayout {
                         .addThemeVariants(NotificationVariant.LUMO_ERROR);
             }
         });
+
         confirmBtn.addThemeVariants(ButtonVariant.LUMO_ERROR);
 
         Button cancelBtn = new Button("Annuler", event -> dialog.close());
 
         VerticalLayout layout = new VerticalLayout(
-                commentaire,
+                typeIncident,
+                gravite,
+                machine,
+                description,
                 new HorizontalLayout(confirmBtn, cancelBtn)
         );
 
-        layout.setWidth("500px");
+        layout.setWidth("550px");
 
         dialog.add(layout);
         dialog.open();
@@ -257,6 +318,83 @@ public class ProcessusSterilisationListView extends VerticalLayout {
                         })
                         .toList()
         );
+    }
+
+    private void openHistoriqueDialog(ProcessusSterilisation processus) {
+
+        Dialog dialog = new Dialog();
+        dialog.setHeaderTitle(
+                "Historique du processus #" + processus.getId()
+        );
+
+        Grid<HistoriqueProcessus> historiqueGrid = new Grid<>();
+
+        historiqueGrid.addColumn(HistoriqueProcessus::getDateAction)
+                .setHeader("Date");
+
+        historiqueGrid.addColumn(HistoriqueProcessus::getEtape)
+                .setHeader("Étape");
+
+        historiqueGrid.addColumn(HistoriqueProcessus::getCommentaire)
+                .setHeader("Commentaire");
+
+        historiqueGrid.setItems(
+                historiqueService.findByProcessus(processus.getId())
+        );
+
+        historiqueGrid.setSizeFull();
+
+        dialog.add(historiqueGrid);
+
+        dialog.setWidth("900px");
+        dialog.setHeight("600px");
+
+        dialog.open();
+    }
+
+    private void openIncidentsDialog(ProcessusSterilisation processus) {
+        Dialog dialog = new Dialog();
+        dialog.setHeaderTitle("Incidents du processus #" + processus.getId());
+
+        Grid<IncidentSterilisation> incidentGrid = new Grid<>();
+
+        incidentGrid.addColumn(IncidentSterilisation::getDateIncident)
+                .setHeader("Date");
+
+        incidentGrid.addColumn(IncidentSterilisation::getTypeIncident)
+                .setHeader("Type");
+
+        incidentGrid.addColumn(IncidentSterilisation::getGravite)
+                .setHeader("Gravité");
+
+        incidentGrid.addColumn(i -> i.getMachine() == null ? "" : i.getMachine().getNom())
+                .setHeader("Machine");
+
+        incidentGrid.addComponentColumn(incident -> {
+            Span description = new Span(incident.getDescription());
+
+            description.getStyle()
+                    .set("white-space", "normal")
+                    .set("word-break", "break-word")
+                    .set("line-height", "1.4");
+
+            return description;
+        }).setHeader("Description").setWidth("350px").setFlexGrow(1);
+
+        incidentGrid.setAllRowsVisible(true);
+
+        incidentGrid.setItems(incidentService.findByProcessus(processus.getId()));
+        incidentGrid.setSizeFull();
+
+        Button closeBtn = new Button("Fermer", event -> dialog.close());
+
+        VerticalLayout layout = new VerticalLayout(incidentGrid, closeBtn);
+        layout.setSizeFull();
+
+        dialog.setWidth("900px");
+        dialog.setHeight("600px");
+        dialog.add(layout);
+        dialog.open();
     }
 
     private String getNextStatutLabel(StatutProcessusSterilisation statut) {

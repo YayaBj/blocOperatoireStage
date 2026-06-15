@@ -4,6 +4,8 @@ import com.example.entity.enums.StatutProcessusSterilisation;
 import jakarta.persistence.*;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "processus_sterilisation")
@@ -37,6 +39,16 @@ public class ProcessusSterilisation {
 
     @Column(name = "commentaire")
     private String commentaire;
+
+    @OneToMany(
+            mappedBy = "processus",
+            cascade = CascadeType.ALL,
+            orphanRemoval = true
+    )
+    private List<HistoriqueProcessus> historique = new ArrayList<>();
+
+    @OneToMany(mappedBy = "processusSterilisation", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<IncidentSterilisation> incidents = new ArrayList<>();
 
     public ProcessusSterilisation() {}
 
@@ -112,5 +124,21 @@ public class ProcessusSterilisation {
 
     public void setCommentaire(String commentaire) {
         this.commentaire = commentaire;
+    }
+
+    public List<HistoriqueProcessus> getHistorique() {
+        return historique;
+    }
+
+    public void setHistorique(List<HistoriqueProcessus> historique) {
+        this.historique = historique;
+    }
+
+    public List<IncidentSterilisation> getIncidents() {
+        return incidents;
+    }
+
+    public void setIncidents(List<IncidentSterilisation> incidents) {
+        this.incidents = incidents;
     }
 }

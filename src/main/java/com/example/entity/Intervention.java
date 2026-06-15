@@ -35,25 +35,20 @@ public class Intervention {
     @Column(name = "statut", nullable = false)
     private StatutIntervention statutIntervention;
 
-    // Relation avec Patient
     @ManyToOne
     @JoinColumn(name = "patient_id", nullable = false)
     private Patient patient;
 
-    // Relation avec Salle
     @ManyToOne
     @JoinColumn(name = "salle_id", nullable = false)
     private Salle salle;
 
-    // Relation avec AffectationPersonnel
     @OneToMany(mappedBy = "intervention", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<AffectationPersonnel> affectations = new ArrayList<>();
 
-    // Relation avec InterventionMateriel
     @OneToMany(mappedBy = "intervention", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<InterventionMateriel> interventionMateriels = new  ArrayList<>();
+    private List<InterventionBoite> interventionBoites = new ArrayList<>();
 
-    // Constructeurs
     public Intervention() {}
 
     public Intervention(String typeIntervention, PrioriteIntervention priorite,
@@ -68,7 +63,6 @@ public class Intervention {
         this.salle = salle;
     }
 
-    // Getters & Setters
 
     public Long getId() {
         return id;
@@ -146,11 +140,11 @@ public class Intervention {
         this.affectations = affectations;
     }
 
-    public List<InterventionMateriel> getInterventionMateriels() {
-        return interventionMateriels;
+    public List<InterventionBoite> getInterventionBoites() {
+        return interventionBoites;
     }
 
-    public void setInterventionMateriels(List<InterventionMateriel> interventionMateriels) {
-        this.interventionMateriels = interventionMateriels;
+    public void setInterventionBoites(List<InterventionBoite> interventionBoites) {
+        this.interventionBoites = interventionBoites;
     }
 }

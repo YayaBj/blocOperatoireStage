@@ -6,6 +6,7 @@ import com.example.entity.UniteMateriel;
 import com.example.entity.enums.PrioriteIntervention;
 import com.example.entity.enums.StatutBoite;
 import com.example.repository.BoiteChirurgicaleRepository;
+import com.example.repository.BoiteMaterielRepository;
 import com.example.repository.UniteMaterielRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,11 +20,13 @@ public class BoiteChirurgicaleService {
 
     private final BoiteChirurgicaleRepository boiteChirurgicaleRepository;
     private final UniteMaterielRepository uniteMaterielRepository;
+    private final BoiteMaterielRepository boiteMaterielRepository;
 
     public BoiteChirurgicaleService(BoiteChirurgicaleRepository boiteChirurgicaleRepository,
-                                    UniteMaterielRepository uniteMaterielRepository) {
+                                    UniteMaterielRepository uniteMaterielRepository, BoiteMaterielRepository boiteMaterielRepository) {
         this.boiteChirurgicaleRepository = boiteChirurgicaleRepository;
         this.uniteMaterielRepository = uniteMaterielRepository;
+        this.boiteMaterielRepository = boiteMaterielRepository;
     }
 
     @Transactional
@@ -34,6 +37,67 @@ public class BoiteChirurgicaleService {
                             String specialite,
                             List<Long> uniteMaterielIds) {
 
+        verifBoite(codeBoite, nom, priorite, uniteMaterielIds);
+
+        String code = codeBoite.trim().toUpperCase();
+
+        if (boiteChirurgicaleRepository.existsByCodeBoiteIgnoreCase(code)) {
+            throw new IllegalArgumentException("Ce code de boîte existe déjà");
+        }
+
+        List<UniteMateriel> unites = uniteMaterielRepository.findAllById(uniteMaterielIds);
+
+        List<Long> idsDistincts = uniteMaterielIds.stream()
+                .distinct()
+                .toList();  
+
+        if (idsDistincts.size() != uniteMaterielIds.size()) {
+            throw new IllegalArgumentException(
+                    "Une unité de matériel est sélectionnée plusieurs fois"
+            );
+        }
+
+        if (unites.size() != uniteMaterielIds.size()) {
+            throw new IllegalArgumentException(
+                    "Une ou plusieurs unités de matériel sont introuvables"
+            );
+        }
+
+        for (UniteMateriel unite : unites) {
+
+            boolean dejaDansUneBoite =
+                    boiteMaterielRepository.existsByUniteMaterielId(
+                            unite.getId()
+                    );
+
+            if (dejaDansUneBoite) {
+                throw new IllegalArgumentException(
+                        "L'unité "
+                                + unite.getCodeInventaire()
+                                + " est déjà affectée à une boîte"
+                );
+            }
+        }
+
+        BoiteChirurgicale boite = new BoiteChirurgicale(
+                code,
+                nom.trim(),
+                priorite,
+                StatutBoite.ACTIVE,
+                departement,
+                specialite,
+                LocalDateTime.now()
+        );
+
+        for (UniteMateriel unite : unites) {
+            BoiteMateriel boiteMateriel = new BoiteMateriel(boite, unite);
+            boite.getMateriels().add(boiteMateriel);
+        }
+
+        boiteChirurgicaleRepository.saveAndFlush(boite);
+    }
+
+    private void verifBoite(String codeBoite, String nom, PrioriteIntervention priorite, List<Long> uniteMaterielIds) {
         if (codeBoite == null || codeBoite.trim().isBlank()) {
             throw new IllegalArgumentException("Le code de la boîte est obligatoire");
         }
@@ -50,34 +114,6 @@ public class BoiteChirurgicaleService {
             throw new IllegalArgumentException("La boîte doit contenir au moins un matériel");
         }
 
-        String code = codeBoite.trim().toUpperCase();
-
-        if (boiteChirurgicaleRepository.existsByCodeBoiteIgnoreCase(code)) {
-            throw new IllegalArgumentException("Ce code de boîte existe déjà");
-        }
-
-        BoiteChirurgicale boite = new BoiteChirurgicale(
-                code,
-                nom.trim(),
-                priorite,
-                StatutBoite.ACTIVE,
-                departement,
-                specialite,
-                LocalDateTime.now()
-        );
-
-        List<UniteMateriel> unites = uniteMaterielRepository.findAllById(uniteMaterielIds);
-
-        if (unites.size() != uniteMaterielIds.size()) {
-            throw new IllegalArgumentException("Une ou plusieurs unités de matériel sont introuvables");
-        }
-
-        for (UniteMateriel unite : unites) {
-            BoiteMateriel boiteMateriel = new BoiteMateriel(boite, unite);
-            boite.getMateriels().add(boiteMateriel);
-        }
-
-        boiteChirurgicaleRepository.saveAndFlush(boite);
     }
 
     @Transactional(readOnly = true)
@@ -109,21 +145,7 @@ public class BoiteChirurgicaleService {
         BoiteChirurgicale boiteDb = boiteChirurgicaleRepository.findById(boite.getId())
                 .orElseThrow(() -> new IllegalArgumentException("Boîte introuvable"));
 
-        if (codeBoite == null || codeBoite.trim().isBlank()) {
-            throw new IllegalArgumentException("Le code de la boîte est obligatoire");
-        }
-
-        if (nom == null || nom.trim().isBlank()) {
-            throw new IllegalArgumentException("Le nom de la boîte est obligatoire");
-        }
-
-        if (priorite == null) {
-            throw new IllegalArgumentException("La priorité est obligatoire");
-        }
-
-        if (uniteMaterielIds == null || uniteMaterielIds.isEmpty()) {
-            throw new IllegalArgumentException("La boîte doit contenir au moins un matériel");
-        }
+        verifBoite(codeBoite, nom, priorite, uniteMaterielIds);
 
         String code = codeBoite.trim().toUpperCase();
 
@@ -134,6 +156,35 @@ public class BoiteChirurgicaleService {
         }
 
         List<UniteMateriel> unites = uniteMaterielRepository.findAllById(uniteMaterielIds);
+
+        if (unites.size() != uniteMaterielIds.size()) {
+            throw new IllegalArgumentException("Une ou plusieurs unités de matériel sont introuvables");
+        }
+
+        List<Long> idsDistincts = uniteMaterielIds.stream()
+                .distinct()
+                .toList();
+
+        if (idsDistincts.size() != uniteMaterielIds.size()) {
+            throw new IllegalArgumentException(
+                    "Une unité de matériel est sélectionnée plusieurs fois"
+            );
+        }
+
+        for (UniteMateriel unite : unites) {
+            boolean dejaDansAutreBoite =
+                    boiteMaterielRepository.existsByUniteMaterielIdAndBoiteChirurgicaleIdNot(
+                            unite.getId(),
+                            boiteDb.getId()
+                    );
+
+            if (dejaDansAutreBoite) {
+                throw new IllegalArgumentException(
+                        "L'unité " + unite.getCodeInventaire()
+                                + " est déjà affectée à une autre boîte"
+                );
+            }
+        }
 
         if (unites.size() != uniteMaterielIds.size()) {
             throw new IllegalArgumentException("Une ou plusieurs unités de matériel sont introuvables");

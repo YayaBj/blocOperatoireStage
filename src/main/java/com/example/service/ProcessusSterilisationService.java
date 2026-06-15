@@ -1,13 +1,12 @@
 package com.example.service;
 
 import com.example.entity.DemandeSterilisation;
+import com.example.entity.HistoriqueProcessus;
 import com.example.entity.Machine;
 import com.example.entity.ProcessusSterilisation;
-import com.example.entity.enums.StatutDemandeSterilisation;
-import com.example.entity.enums.StatutMachine;
-import com.example.entity.enums.StatutProcessusSterilisation;
-import com.example.entity.enums.TypeMachine;
+import com.example.entity.enums.*;
 import com.example.repository.DemandeSterilisationRepository;
+import com.example.repository.HistoriqueProcessusRepository;
 import com.example.repository.MachineRepository;
 import com.example.repository.ProcessusSterilisationRepository;
 import org.springframework.stereotype.Service;
@@ -19,16 +18,23 @@ import java.util.List;
 @Service
 public class ProcessusSterilisationService {
 
+    private final MouvementBoiteService mouvementBoiteService;
+
     private final ProcessusSterilisationRepository processusRepository;
     private final DemandeSterilisationRepository demandeRepository;
     private final MachineRepository machineRepository;
+    private final HistoriqueProcessusRepository historiqueRepository;
 
     public ProcessusSterilisationService(ProcessusSterilisationRepository processusRepository,
                                          DemandeSterilisationRepository demandeRepository,
-                                         MachineRepository machineRepository) {
+                                         MachineRepository machineRepository,
+                                         HistoriqueProcessusRepository historiqueRepository,
+                                         MouvementBoiteService mouvementBoiteService) {
         this.processusRepository = processusRepository;
         this.demandeRepository = demandeRepository;
         this.machineRepository = machineRepository;
+        this.historiqueRepository = historiqueRepository;
+        this.mouvementBoiteService = mouvementBoiteService;
     }
 
     @Transactional
@@ -88,6 +94,16 @@ public class ProcessusSterilisationService {
         demandeRepository.save(demande);
         machineRepository.save(machineLavage);
         machineRepository.save(machineAutoclave);
+
+        HistoriqueProcessus historique =
+                new HistoriqueProcessus(
+                        LocalDateTime.now(),
+                        StatutProcessusSterilisation.EN_ATTENTE,
+                        "Processus créé",
+                        processus
+                );
+
+        historiqueRepository.save(historique);
     }
 
     @Transactional
@@ -104,6 +120,16 @@ public class ProcessusSterilisationService {
 
         StatutProcessusSterilisation prochainStatut = getNextStatut(processus.getStatut());
         processus.setStatut(prochainStatut);
+        enregistrerMouvementSelonEtape(processus, prochainStatut);
+
+        historiqueRepository.save(
+                new HistoriqueProcessus(
+                        LocalDateTime.now(),
+                        prochainStatut,
+                        "Passage à l'étape " + prochainStatut,
+                        processus
+                )
+        );
 
         if (prochainStatut == StatutProcessusSterilisation.TERMINE) {
             terminerProcessus(processus);
@@ -121,11 +147,23 @@ public class ProcessusSterilisationService {
         }
 
         processus.setStatut(StatutProcessusSterilisation.ECHEC);
+        enregistrerMouvementSelonEtape(processus, StatutProcessusSterilisation.ECHEC);
         processus.setCommentaire(commentaire);
 
         processus.getDemandeSterilisation().setStatut(StatutDemandeSterilisation.REFUSEE);
 
         libererMachines(processus);
+
+        historiqueRepository.save(
+                new HistoriqueProcessus(
+                        LocalDateTime.now(),
+                        StatutProcessusSterilisation.ECHEC,
+                        commentaire == null || commentaire.isBlank()
+                                ? "Processus marqué en échec"
+                                : commentaire,
+                        processus
+                )
+        );
 
         processusRepository.saveAndFlush(processus);
     }
@@ -194,5 +232,65 @@ public class ProcessusSterilisationService {
     public ProcessusSterilisation findById(Long id) {
         return processusRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Processus introuvable"));
+    }
+
+    private void enregistrerMouvementSelonEtape(ProcessusSterilisation processus,
+                                                StatutProcessusSterilisation statut) {
+
+        Long boiteId = processus.getDemandeSterilisation()
+                .getBoiteChirurgicale()
+                .getId();
+
+        Long processusId = processus.getId();
+
+        switch (statut) {
+            case LAVAGE -> mouvementBoiteService.enregistrerMouvement(
+                    boiteId,
+                    processusId,
+                    ZoneBoite.STOCK_SALE,
+                    ZoneBoite.LAVAGE,
+                    TypeMouvementBoite.PASSAGE_LAVAGE,
+                    "Boîte envoyée au lavage"
+            );
+
+            case CONDITIONNEMENT -> mouvementBoiteService.enregistrerMouvement(
+                    boiteId,
+                    processusId,
+                    ZoneBoite.LAVAGE,
+                    ZoneBoite.CONDITIONNEMENT,
+                    TypeMouvementBoite.PASSAGE_CONDITIONNEMENT,
+                    "Boîte envoyée au conditionnement"
+            );
+
+            case AUTOCLAVE -> mouvementBoiteService.enregistrerMouvement(
+                    boiteId,
+                    processusId,
+                    ZoneBoite.CONDITIONNEMENT,
+                    ZoneBoite.AUTOCLAVE,
+                    TypeMouvementBoite.PASSAGE_AUTOCLAVE,
+                    "Boîte envoyée à l’autoclave"
+            );
+
+            case TERMINE -> mouvementBoiteService.enregistrerMouvement(
+                    boiteId,
+                    processusId,
+                    ZoneBoite.AUTOCLAVE,
+                    ZoneBoite.STOCK_STERILE,
+                    TypeMouvementBoite.RETOUR_STOCK_STERILE,
+                    "Boîte retournée au stock stérile"
+            );
+
+            case ECHEC -> mouvementBoiteService.enregistrerMouvement(
+                    boiteId,
+                    processusId,
+                    null,
+                    ZoneBoite.QUARANTAINE,
+                    TypeMouvementBoite.MISE_QUARANTAINE,
+                    "Boîte mise en quarantaine après échec"
+            );
+
+            default -> {
+            }
+        }
     }
 }

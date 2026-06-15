@@ -22,11 +22,9 @@ public class Salle {
     @Column(name = "statut_salle", nullable = false)
     private StatutSalle statutSalle;
 
-    // Relation avec Intervention
     @OneToMany(mappedBy = "salle")
     private List<Intervention> interventions;
 
-    // Constructeurs
     public Salle() {}
 
     public Salle(String numeroSalle, String typeSalle, StatutSalle statutSalle) {
@@ -35,7 +33,6 @@ public class Salle {
         this.statutSalle = statutSalle;
     }
 
-    // Getters & Setters
 
     public Long getId() {
         return id;

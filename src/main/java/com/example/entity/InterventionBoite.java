@@ -2,9 +2,10 @@ package com.example.entity;
 
 import jakarta.persistence.*;
 
+
 @Entity
-@Table(name = "intervention_materiel")
-public class InterventionMateriel {
+@Table(name = "intervention_boite")
+public class InterventionBoite {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -15,16 +16,15 @@ public class InterventionMateriel {
     private Intervention intervention;
 
     @ManyToOne
-    @JoinColumn(name = "unite_materiel_id", nullable = false)
-    private UniteMateriel uniteMateriel;
+    @JoinColumn(name = "boite_chirurgicale_id", nullable = false)
+    private BoiteChirurgicale boiteChirurgicale;
 
-    public InterventionMateriel() {}
+    public InterventionBoite() {}
 
-    public InterventionMateriel(Intervention intervention, UniteMateriel uniteMateriel) {
+    public InterventionBoite(Intervention intervention, BoiteChirurgicale boiteChirurgicale) {
         this.intervention = intervention;
-        this.uniteMateriel = uniteMateriel;
+        this.boiteChirurgicale = boiteChirurgicale;
     }
-
 
     public Long getId() {
         return id;
@@ -38,11 +38,11 @@ public class InterventionMateriel {
         this.intervention = intervention;
     }
 
-    public UniteMateriel getUniteMateriel() {
-        return uniteMateriel;
+    public BoiteChirurgicale getBoiteChirurgicale() {
+        return boiteChirurgicale;
     }
 
-    public void setUniteMateriel(UniteMateriel uniteMateriel) {
-        this.uniteMateriel = uniteMateriel;
+    public void setBoiteChirurgicale(BoiteChirurgicale boiteChirurgicale) {
+        this.boiteChirurgicale = boiteChirurgicale;
     }
 }
