@@ -40,8 +40,13 @@ public class MaterielService {
 
             String codeInventaire = generateCodeInventaire(nomMateriel, i);
 
-            UniteMateriel unite = new UniteMateriel(codeInventaire, etat, materiel);
-            materiel.getUnites().add(unite);
+            materiel.getUnites().add(
+                    creerUnite(
+                            codeInventaire,
+                            etat,
+                            materiel
+                    )
+            );
         }
 
         materielRepository.saveAndFlush(materiel);
@@ -76,11 +81,25 @@ public class MaterielService {
 
     @Transactional
     public void updateMateriel(Materiel materiel, String nomMateriel, String typeMateriel, int seuilAlerte) {
-        Materiel materielComplet = materielRepository.findById(materiel.getId())
-                .orElseThrow(() -> new IllegalArgumentException("Matériel introuvable"));
+        Materiel materielComplet = findById(materiel.getId());
 
         if (seuilAlerte < 0 || seuilAlerte > materielComplet.getStock().getQuantiteTotale()) {
             throw new IllegalArgumentException("Le seuil d’alerte doit être entre 0 et la quantité totale");
+        }
+
+        Materiel existing =
+                materielRepository
+                        .findByNomMaterielIgnoreCaseAndTypeMaterielIgnoreCase(
+                                nomMateriel,
+                                typeMateriel
+                        );
+
+        if (existing != null &&
+                !existing.getId().equals(materielComplet.getId())) {
+
+            throw new IllegalArgumentException(
+                    "Ce matériel existe déjà"
+            );
         }
 
         materielComplet.setNomMateriel(nomMateriel);
@@ -106,8 +125,7 @@ public class MaterielService {
             throw new IllegalArgumentException("La quantité ajoutée doit être supérieure à 0");
         }
 
-        Materiel materielComplet = materielRepository.findById(materiel.getId())
-                .orElseThrow(() -> new IllegalArgumentException("Matériel introuvable"));
+        Materiel materielComplet = findById(materiel.getId());
 
         int ancienneQuantite = materielComplet.getStock().getQuantiteTotale();
 
@@ -117,13 +135,13 @@ public class MaterielService {
                     ancienneQuantite + i
             );
 
-            UniteMateriel unite = new UniteMateriel(
-                    codeInventaire,
-                    EtatMateriel.STERILE,
-                    materielComplet
+            materielComplet.getUnites().add(
+                    creerUnite(
+                            codeInventaire,
+                            EtatMateriel.STERILE,
+                            materielComplet
+                    )
             );
-
-            materielComplet.getUnites().add(unite);
         }
 
         materielComplet.getStock().setQuantiteTotale(ancienneQuantite + quantiteAjoutee);
@@ -136,8 +154,25 @@ public class MaterielService {
 
     @Transactional(readOnly = true)
     public List<UniteMateriel> findUnitesByMateriel(Materiel materiel) {
-        Materiel materielComplet = materielRepository.findById(materiel.getId())
-                .orElseThrow(() -> new IllegalArgumentException("Matériel introuvable"));
+        Materiel materielComplet = findById(materiel.getId());
         return new ArrayList<>(materielComplet.getUnites());
+    }
+
+    private Materiel findById(Long id) {
+        return materielRepository.findById(id)
+                .orElseThrow(() ->
+                        new IllegalArgumentException("Matériel introuvable"));
+    }
+
+    private UniteMateriel creerUnite(
+            String codeInventaire,
+            EtatMateriel etat,
+            Materiel materiel) {
+
+        return new UniteMateriel(
+                codeInventaire,
+                etat,
+                materiel
+        );
     }
 }

@@ -5,10 +5,13 @@ import com.example.entity.enums.StatutDemandeSterilisation;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface DemandeSterilisationRepository extends JpaRepository<DemandeSterilisation, Long> {
 
     boolean existsByCodeDemandeIgnoreCase(String codeDemande);
 
     List<DemandeSterilisation> findByStatut(StatutDemandeSterilisation statut);
+
+    Optional<DemandeSterilisation> findByCodeDemande(String codeDemande);
 }

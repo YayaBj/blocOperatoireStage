@@ -37,27 +37,10 @@ public class MouvementBoiteService {
                                      TypeMouvementBoite typeMouvement,
                                      String commentaire) {
 
-        if (boiteId == null) {
-            throw new IllegalArgumentException("La boîte est obligatoire");
-        }
+        verifierMouvement(boiteId, nouvelleZone, typeMouvement);
 
-        if (nouvelleZone == null) {
-            throw new IllegalArgumentException("La nouvelle zone est obligatoire");
-        }
-
-        if (typeMouvement == null) {
-            throw new IllegalArgumentException("Le type de mouvement est obligatoire");
-        }
-
-        BoiteChirurgicale boite = boiteChirurgicaleRepository.findById(boiteId)
-                .orElseThrow(() -> new IllegalArgumentException("Boîte introuvable"));
-
-        ProcessusSterilisation processus = null;
-
-        if (processusId != null) {
-            processus = processusSterilisationRepository.findById(processusId)
-                    .orElseThrow(() -> new IllegalArgumentException("Processus introuvable"));
-        }
+        BoiteChirurgicale boite = findBoite(boiteId);
+        ProcessusSterilisation processus = findProcessusIfPresent(processusId);
 
         MouvementBoite mouvement = new MouvementBoite(
                 LocalDateTime.now(),
@@ -70,6 +53,20 @@ public class MouvementBoiteService {
         );
 
         mouvementBoiteRepository.saveAndFlush(mouvement);
+    }
+
+    private static void verifierMouvement(Long boiteId, ZoneBoite nouvelleZone, TypeMouvementBoite typeMouvement) {
+        if (boiteId == null) {
+            throw new IllegalArgumentException("La boîte est obligatoire");
+        }
+
+        if (nouvelleZone == null) {
+            throw new IllegalArgumentException("La nouvelle zone est obligatoire");
+        }
+
+        if (typeMouvement == null) {
+            throw new IllegalArgumentException("Le type de mouvement est obligatoire");
+        }
     }
 
     @Transactional(readOnly = true)
@@ -85,5 +82,19 @@ public class MouvementBoiteService {
     @Transactional(readOnly = true)
     public List<MouvementBoite> findByProcessus(Long processusId) {
         return mouvementBoiteRepository.findByProcessusSterilisationIdOrderByDateMouvementAsc(processusId);
+    }
+
+    private BoiteChirurgicale findBoite(Long boiteId) {
+        return boiteChirurgicaleRepository.findById(boiteId)
+                .orElseThrow(() -> new IllegalArgumentException("Boîte introuvable"));
+    }
+
+    private ProcessusSterilisation findProcessusIfPresent(Long processusId) {
+        if (processusId == null) {
+            return null;
+        }
+
+        return processusSterilisationRepository.findById(processusId)
+                .orElseThrow(() -> new IllegalArgumentException("Processus introuvable"));
     }
 }

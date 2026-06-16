@@ -138,63 +138,37 @@ public class PersonnelListView extends VerticalLayout {
     }
 
     private void saveOrUpdatePersonnel() {
-        String mat = matricule.getValue().trim().toUpperCase();
-        String nom = nomPersonnel.getValue().trim();
-        String prenom = prenomPersonnel.getValue().trim();
-        String spec = specialite.getValue().trim();
+        try {
+            if (selectedPersonnel == null) {
+                personnelService.createPersonnel(
+                        matricule.getValue(),
+                        nomPersonnel.getValue(),
+                        prenomPersonnel.getValue(),
+                        specialite.getValue()
+                );
 
-        if (mat.isBlank()) {
-            matricule.setInvalid(true);
-            matricule.setErrorMessage("Le matricule est obligatoire");
-            return;
+                Notification.show("Personnel ajouté", 3000, Notification.Position.BOTTOM_END)
+                        .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+            } else {
+                personnelService.updatePersonnel(
+                        selectedPersonnel,
+                        matricule.getValue(),
+                        nomPersonnel.getValue(),
+                        prenomPersonnel.getValue(),
+                        specialite.getValue()
+                );
+
+                Notification.show("Personnel modifié", 3000, Notification.Position.BOTTOM_END)
+                        .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+            }
+
+            refreshGrid();
+            clearForm();
+
+        } catch (IllegalArgumentException e) {
+            Notification.show(e.getMessage(), 4000, Notification.Position.BOTTOM_END)
+                    .addThemeVariants(NotificationVariant.LUMO_ERROR);
         }
-
-        if (personnelService.getPersonnelByMatricule(mat) != null && selectedPersonnel == null) {
-            matricule.setInvalid(true);
-            matricule.setErrorMessage("Ce matricule existe déjà");
-            return;
-        }
-
-        matricule.setInvalid(false);
-
-        if (nom.isBlank()) {
-            nomPersonnel.setInvalid(true);
-            nomPersonnel.setErrorMessage("Le nom est obligatoire");
-            return;
-        }
-
-        nomPersonnel.setInvalid(false);
-
-        if (prenom.isBlank()) {
-            prenomPersonnel.setInvalid(true);
-            prenomPersonnel.setErrorMessage("Le prénom est obligatoire");
-            return;
-        }
-
-        prenomPersonnel.setInvalid(false);
-
-        if (spec.isBlank()) {
-            specialite.setInvalid(true);
-            specialite.setErrorMessage("La spécialité est obligatoire");
-            return;
-        }
-
-        specialite.setInvalid(false);
-
-        if (selectedPersonnel == null) {
-            personnelService.createPersonnel(mat, nom, prenom, spec);
-
-            Notification.show("Personnel ajouté", 3000, Notification.Position.BOTTOM_END)
-                    .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
-        } else {
-            personnelService.updatePersonnel(selectedPersonnel, mat, nom, prenom, spec);
-
-            Notification.show("Personnel modifié", 3000, Notification.Position.BOTTOM_END)
-                    .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
-        }
-
-        refreshGrid();
-        clearForm();
     }
 
     private void clearForm() {

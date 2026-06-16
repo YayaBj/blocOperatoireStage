@@ -41,17 +41,7 @@ public class DemandeSterilisationService {
                               Long interventionId,
                               String commentaire) {
 
-        if (codeDemande == null || codeDemande.trim().isBlank()) {
-            throw new IllegalArgumentException("Le code de la demande est obligatoire");
-        }
-
-        if (priorite == null) {
-            throw new IllegalArgumentException("La priorité est obligatoire");
-        }
-
-        if (boiteId == null) {
-            throw new IllegalArgumentException("La boîte est obligatoire");
-        }
+        verifierDonneesDemande(codeDemande, priorite, boiteId);
 
         String code = codeDemande.trim().toUpperCase();
 
@@ -81,9 +71,8 @@ public class DemandeSterilisationService {
         );
 
         demandeRepository.saveAndFlush(demande);
-        mouvementBoiteService.enregistrerMouvement(
-                boite.getId(),
-                null,
+        enregistrerMouvementDemande(
+                demande,
                 ZoneBoite.BLOC_OPERATOIRE,
                 ZoneBoite.STOCK_SALE,
                 TypeMouvementBoite.RETOUR_SALE,
@@ -91,19 +80,34 @@ public class DemandeSterilisationService {
         );
     }
 
+    private static void verifierDonneesDemande(String codeDemande, PrioriteIntervention priorite, Long boiteId) {
+        if (codeDemande == null || codeDemande.trim().isBlank()) {
+            throw new IllegalArgumentException("Le code de la demande est obligatoire");
+        }
+
+        if (priorite == null) {
+            throw new IllegalArgumentException("La priorité est obligatoire");
+        }
+
+        if (boiteId == null) {
+            throw new IllegalArgumentException("La boîte est obligatoire");
+        }
+    }
+
     @Transactional
     public void envoyerDemande(Long demandeId) {
         DemandeSterilisation demande = findById(demandeId);
 
-        if (demande.getStatut() != StatutDemandeSterilisation.BROUILLON) {
-            throw new IllegalArgumentException("Seule une demande brouillon peut être envoyée");
-        }
+        verifierStatut(
+                demande,
+                StatutDemandeSterilisation.BROUILLON,
+                "Seule une demande brouillon peut être envoyée"
+        );
 
         demande.setStatut(StatutDemandeSterilisation.ENVOYEE);
 
-        mouvementBoiteService.enregistrerMouvement(
-                demande.getBoiteChirurgicale().getId(),
-                null,
+        enregistrerMouvementDemande(
+                demande,
                 ZoneBoite.STOCK_SALE,
                 ZoneBoite.STOCK_SALE,
                 TypeMouvementBoite.TRANSFERT_STERILISATION,
@@ -119,15 +123,16 @@ public class DemandeSterilisationService {
     public void accepterDemande(Long demandeId) {
         DemandeSterilisation demande = findById(demandeId);
 
-        if (demande.getStatut() != StatutDemandeSterilisation.ENVOYEE) {
-            throw new IllegalArgumentException("Seule une demande envoyée peut être acceptée");
-        }
+        verifierStatut(
+                demande,
+                StatutDemandeSterilisation.ENVOYEE,
+                "Seule une demande envoyée peut être acceptée"
+        );
 
         demande.setStatut(StatutDemandeSterilisation.ACCEPTEE);
 
-        mouvementBoiteService.enregistrerMouvement(
-                demande.getBoiteChirurgicale().getId(),
-                null,
+        enregistrerMouvementDemande(
+                demande,
                 ZoneBoite.STOCK_SALE,
                 ZoneBoite.STOCK_SALE,
                 TypeMouvementBoite.TRANSFERT_STERILISATION,
@@ -143,21 +148,23 @@ public class DemandeSterilisationService {
     public void refuserDemande(Long demandeId) {
         DemandeSterilisation demande = findById(demandeId);
 
-        if (demande.getStatut() != StatutDemandeSterilisation.ENVOYEE) {
-            throw new IllegalArgumentException("Seule une demande envoyée peut être refusée");
-        }
+        verifierStatut(
+                demande,
+                StatutDemandeSterilisation.ENVOYEE,
+                "Seule une demande envoyée peut être refusée"
+        );
 
         demande.setStatut(StatutDemandeSterilisation.REFUSEE);
 
-        mouvementBoiteService.enregistrerMouvement(
-                demande.getBoiteChirurgicale().getId(),
-                null,
+        enregistrerMouvementDemande(
+                demande,
                 ZoneBoite.STOCK_SALE,
                 ZoneBoite.QUARANTAINE,
                 TypeMouvementBoite.MISE_QUARANTAINE,
                 "Demande refusée, boîte mise en quarantaine"
         );
 
+        demande.getBoiteChirurgicale().setStatut(StatutBoite.INCIDENT);
 
         demandeRepository.saveAndFlush(demande);
     }
@@ -172,14 +179,15 @@ public class DemandeSterilisationService {
 
         demande.setStatut(StatutDemandeSterilisation.ANNULEE);
 
-        mouvementBoiteService.enregistrerMouvement(
-                demande.getBoiteChirurgicale().getId(),
-                null,
+        enregistrerMouvementDemande(
+                demande,
                 ZoneBoite.STOCK_SALE,
                 ZoneBoite.BLOC_OPERATOIRE,
                 TypeMouvementBoite.SORTIE_STOCK,
                 "Demande annulée, retour de la boîte au bloc opératoire"
         );
+
+        demande.getBoiteChirurgicale().setStatut(StatutBoite.ACTIVE);
 
         demandeRepository.saveAndFlush(demande);
     }
@@ -193,5 +201,40 @@ public class DemandeSterilisationService {
     public DemandeSterilisation findById(Long id) {
         return demandeRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Demande introuvable"));
+    }
+
+
+    @Transactional(readOnly = true)
+    public DemandeSterilisation findByCodeDemande(String codeDemande) {
+        return demandeRepository
+                .findByCodeDemande(codeDemande)
+                .orElseThrow(() ->
+                        new IllegalArgumentException(
+                                "Demande de stérilisation introuvable"
+                        )
+                );
+    }
+
+    private void enregistrerMouvementDemande(DemandeSterilisation demande,
+                                             ZoneBoite ancienneZone,
+                                             ZoneBoite nouvelleZone,
+                                             TypeMouvementBoite typeMouvement,
+                                             String commentaire) {
+        mouvementBoiteService.enregistrerMouvement(
+                demande.getBoiteChirurgicale().getId(),
+                null,
+                ancienneZone,
+                nouvelleZone,
+                typeMouvement,
+                commentaire
+        );
+    }
+
+    private void verifierStatut(DemandeSterilisation demande,
+                                StatutDemandeSterilisation statutAttendu,
+                                String messageErreur) {
+        if (demande.getStatut() != statutAttendu) {
+            throw new IllegalArgumentException(messageErreur);
+        }
     }
 }

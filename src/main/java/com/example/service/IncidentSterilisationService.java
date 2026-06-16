@@ -4,11 +4,11 @@ import com.example.entity.IncidentSterilisation;
 import com.example.entity.Machine;
 import com.example.entity.ProcessusSterilisation;
 import com.example.entity.enums.GraviteIncident;
-import com.example.entity.enums.StatutProcessusSterilisation;
 import com.example.entity.enums.TypeIncidentSterilisation;
 import com.example.repository.IncidentSterilisationRepository;
 import com.example.repository.MachineRepository;
 import com.example.repository.ProcessusSterilisationRepository;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,6 +37,40 @@ public class IncidentSterilisationService {
                                GraviteIncident gravite,
                                String description) {
 
+        verifierDonneesIncident(processusId, typeIncident, gravite, description);
+
+        ProcessusSterilisation processus = findProcessus(processusId);
+
+        Machine machine = findMachineIfPresent(machineId);
+
+        IncidentSterilisation incident = new IncidentSterilisation(
+                LocalDateTime.now(),
+                typeIncident,
+                gravite,
+                description.trim(),
+                processus,
+                machine
+        );
+
+        incidentRepository.saveAndFlush(incident);
+    }
+
+    @Nullable
+    private Machine findMachineIfPresent(Long machineId) {
+        if (machineId == null) {
+            return null;
+        }
+
+        return machineRepository.findById(machineId)
+                .orElseThrow(() -> new IllegalArgumentException("Machine introuvable"));
+    }
+
+    private ProcessusSterilisation findProcessus(Long processusId) {
+        return processusRepository.findById(processusId)
+                .orElseThrow(() -> new IllegalArgumentException("Processus introuvable"));
+    }
+
+    private static void verifierDonneesIncident(Long processusId, TypeIncidentSterilisation typeIncident, GraviteIncident gravite, String description) {
         if (processusId == null) {
             throw new IllegalArgumentException("Le processus est obligatoire");
         }
@@ -51,46 +85,6 @@ public class IncidentSterilisationService {
 
         if (description == null || description.trim().isBlank()) {
             throw new IllegalArgumentException("La description est obligatoire");
-        }
-
-        ProcessusSterilisation processus = processusRepository.findById(processusId)
-                .orElseThrow(() -> new IllegalArgumentException("Processus introuvable"));
-
-        Machine machine = null;
-
-        if (machineId != null) {
-            machine = machineRepository.findById(machineId)
-                    .orElseThrow(() -> new IllegalArgumentException("Machine introuvable"));
-        }
-
-        IncidentSterilisation incident = new IncidentSterilisation(
-                LocalDateTime.now(),
-                typeIncident,
-                gravite,
-                description.trim(),
-                processus,
-                machine
-        );
-
-        incidentRepository.saveAndFlush(incident);
-    }
-
-    @Transactional
-    public void createIncidentAndFailProcess(Long processusId,
-                                             Long machineId,
-                                             TypeIncidentSterilisation typeIncident,
-                                             GraviteIncident gravite,
-                                             String description) {
-
-        createIncident(processusId, machineId, typeIncident, gravite, description);
-
-        ProcessusSterilisation processus = processusRepository.findById(processusId)
-                .orElseThrow(() -> new IllegalArgumentException("Processus introuvable"));
-
-        if (processus.getStatut() != StatutProcessusSterilisation.TERMINE) {
-            processus.setStatut(StatutProcessusSterilisation.ECHEC);
-            processus.setCommentaire(description);
-            processusRepository.saveAndFlush(processus);
         }
     }
 

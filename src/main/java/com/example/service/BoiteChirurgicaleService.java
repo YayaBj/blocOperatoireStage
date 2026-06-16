@@ -8,6 +8,7 @@ import com.example.entity.enums.StatutBoite;
 import com.example.repository.BoiteChirurgicaleRepository;
 import com.example.repository.BoiteMaterielRepository;
 import com.example.repository.UniteMaterielRepository;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,7 +38,7 @@ public class BoiteChirurgicaleService {
                             String specialite,
                             List<Long> uniteMaterielIds) {
 
-        verifBoite(codeBoite, nom, priorite, uniteMaterielIds);
+        verifierDoublonsUnites(codeBoite, nom, priorite, uniteMaterielIds);
 
         String code = codeBoite.trim().toUpperCase();
 
@@ -45,23 +46,9 @@ public class BoiteChirurgicaleService {
             throw new IllegalArgumentException("Ce code de boîte existe déjà");
         }
 
-        List<UniteMateriel> unites = uniteMaterielRepository.findAllById(uniteMaterielIds);
+        verifierDoublonsUnites(uniteMaterielIds);
 
-        List<Long> idsDistincts = uniteMaterielIds.stream()
-                .distinct()
-                .toList();  
-
-        if (idsDistincts.size() != uniteMaterielIds.size()) {
-            throw new IllegalArgumentException(
-                    "Une unité de matériel est sélectionnée plusieurs fois"
-            );
-        }
-
-        if (unites.size() != uniteMaterielIds.size()) {
-            throw new IllegalArgumentException(
-                    "Une ou plusieurs unités de matériel sont introuvables"
-            );
-        }
+        List<UniteMateriel> unites = findUnites(uniteMaterielIds);
 
         for (UniteMateriel unite : unites) {
 
@@ -97,7 +84,19 @@ public class BoiteChirurgicaleService {
         boiteChirurgicaleRepository.saveAndFlush(boite);
     }
 
-    private void verifBoite(String codeBoite, String nom, PrioriteIntervention priorite, List<Long> uniteMaterielIds) {
+    @NotNull
+    private List<UniteMateriel> findUnites(List<Long> uniteMaterielIds) {
+        List<UniteMateriel> unites = uniteMaterielRepository.findAllById(uniteMaterielIds);
+
+        if (unites.size() != uniteMaterielIds.size()) {
+            throw new IllegalArgumentException(
+                    "Une ou plusieurs unités de matériel sont introuvables"
+            );
+        }
+        return unites;
+    }
+
+    private void verifierDoublonsUnites(String codeBoite, String nom, PrioriteIntervention priorite, List<Long> uniteMaterielIds) {
         if (codeBoite == null || codeBoite.trim().isBlank()) {
             throw new IllegalArgumentException("Le code de la boîte est obligatoire");
         }
@@ -145,7 +144,7 @@ public class BoiteChirurgicaleService {
         BoiteChirurgicale boiteDb = boiteChirurgicaleRepository.findById(boite.getId())
                 .orElseThrow(() -> new IllegalArgumentException("Boîte introuvable"));
 
-        verifBoite(codeBoite, nom, priorite, uniteMaterielIds);
+        verifierDoublonsUnites(codeBoite, nom, priorite, uniteMaterielIds);
 
         String code = codeBoite.trim().toUpperCase();
 
@@ -155,22 +154,10 @@ public class BoiteChirurgicaleService {
             throw new IllegalArgumentException("Ce code de boîte est déjà utilisé");
         }
 
-        List<UniteMateriel> unites = uniteMaterielRepository.findAllById(uniteMaterielIds);
+        verifierDoublonsUnites(uniteMaterielIds);
 
-        if (unites.size() != uniteMaterielIds.size()) {
-            throw new IllegalArgumentException("Une ou plusieurs unités de matériel sont introuvables");
-        }
-
-        List<Long> idsDistincts = uniteMaterielIds.stream()
-                .distinct()
-                .toList();
-
-        if (idsDistincts.size() != uniteMaterielIds.size()) {
-            throw new IllegalArgumentException(
-                    "Une unité de matériel est sélectionnée plusieurs fois"
-            );
-        }
-
+        List<UniteMateriel> unites = findUnites(uniteMaterielIds);
+        
         for (UniteMateriel unite : unites) {
             boolean dejaDansAutreBoite =
                     boiteMaterielRepository.existsByUniteMaterielIdAndBoiteChirurgicaleIdNot(
@@ -184,10 +171,6 @@ public class BoiteChirurgicaleService {
                                 + " est déjà affectée à une autre boîte"
                 );
             }
-        }
-
-        if (unites.size() != uniteMaterielIds.size()) {
-            throw new IllegalArgumentException("Une ou plusieurs unités de matériel sont introuvables");
         }
 
         boiteDb.setCodeBoite(code);
@@ -204,6 +187,18 @@ public class BoiteChirurgicaleService {
         }
 
         boiteChirurgicaleRepository.saveAndFlush(boiteDb);
+    }
+
+    private static void verifierDoublonsUnites(List<Long> uniteMaterielIds) {
+        List<Long> idsDistincts = uniteMaterielIds.stream()
+                .distinct()
+                .toList();
+
+        if (idsDistincts.size() != uniteMaterielIds.size()) {
+            throw new IllegalArgumentException(
+                    "Une unité de matériel est sélectionnée plusieurs fois"
+            );
+        }
     }
 
     @Transactional

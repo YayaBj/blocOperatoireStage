@@ -129,7 +129,7 @@ public class DataInitializer implements CommandLineRunner {
                     PrioriteIntervention.URGENTE,
                     "Bloc opératoire",
                     "Cardiologie",
-                    List.of(unites.get(0).getId(), unites.get(3).getId())
+                    List.of(unites.get(6).getId(), unites.get(7).getId())
             );
 
             boiteChirurgicaleService.createBoite(
@@ -138,7 +138,7 @@ public class DataInitializer implements CommandLineRunner {
                     PrioriteIntervention.URGENTE,
                     "Bloc opératoire",
                     "Neurochirurgie",
-                    List.of(unites.get(1).getId(), unites.get(4).getId())
+                    List.of(unites.get(8).getId(), unites.get(9).getId())
             );
 
             boiteChirurgicaleService.createBoite(
@@ -147,7 +147,7 @@ public class DataInitializer implements CommandLineRunner {
                     PrioriteIntervention.NORMALE,
                     "Bloc opératoire",
                     "Urologie",
-                    List.of(unites.get(2).getId(), unites.get(5).getId())
+                    List.of(unites.get(10).getId(), unites.get(11).getId())
             );
 
         } catch (IllegalArgumentException ignored) {

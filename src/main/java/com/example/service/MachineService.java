@@ -53,8 +53,13 @@ public class MachineService {
 
         verifierMachine(nom, typeMachine, tempsProcessusMinutes, statut);
 
-        Machine machineDb = machineRepository.findById(machine.getId())
-                .orElseThrow(() -> new IllegalArgumentException("Machine introuvable"));
+        Machine machineDb = findById(machine.getId());
+
+        Machine existing = machineRepository.findByNomIgnoreCase(nom.trim());
+
+        if (existing != null && !existing.getId().equals(machineDb.getId())) {
+            throw new IllegalArgumentException("Ce nom de machine est déjà utilisé");
+        }
 
         machineDb.setNom(nom.trim());
         machineDb.setTypeMachine(typeMachine);
@@ -67,16 +72,14 @@ public class MachineService {
 
     @Transactional
     public void deleteMachine(Machine machine) {
-        Machine machineDb = machineRepository.findById(machine.getId())
-                .orElseThrow(() -> new IllegalArgumentException("Machine introuvable"));
+        Machine machineDb = findById(machine.getId());
 
         machineRepository.delete(machineDb);
     }
 
     @Transactional
     public void marquerUtilisation(Long machineId, String cycle) {
-        Machine machine = machineRepository.findById(machineId)
-                .orElseThrow(() -> new IllegalArgumentException("Machine introuvable"));
+        Machine machine = findById(machineId);
 
         machine.setCycleEnCours(cycle);
         machine.setDerniereUtilisation(LocalDateTime.now());
@@ -118,5 +121,10 @@ public class MachineService {
         if (statut == null) {
             throw new IllegalArgumentException("Le statut de la machine est obligatoire");
         }
+    }
+
+    private Machine findById(Long machineId) {
+        return machineRepository.findById(machineId)
+                .orElseThrow(() -> new IllegalArgumentException("Machine introuvable"));
     }
 }

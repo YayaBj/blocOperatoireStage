@@ -14,4 +14,6 @@ public interface MachineRepository extends JpaRepository<Machine, Long> {
     List<Machine> findByTypeMachine(TypeMachine typeMachine);
 
     List<Machine> findByStatut(StatutMachine statut);
+
+    Machine findByNomIgnoreCase(String nom);
 }

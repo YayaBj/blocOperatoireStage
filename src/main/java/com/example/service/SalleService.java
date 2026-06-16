@@ -19,16 +19,57 @@ public class SalleService {
 
     @Transactional
     public void createSalle(String numeroSalle, String typeSalle, StatutSalle statutSalle) {
-        var salle = new Salle(numeroSalle, typeSalle, statutSalle);
+        verifierSalle(numeroSalle, typeSalle, statutSalle);
+
+        String numero = numeroSalle.trim().toUpperCase();
+
+        if (salleRepository.findByNumeroSalle(numero) != null) {
+            throw new IllegalArgumentException("Cette salle existe déjà");
+        }
+
+        Salle salle = new Salle(
+                numero,
+                typeSalle.trim(),
+                statutSalle
+        );
+
         salleRepository.saveAndFlush(salle);
     }
 
     @Transactional
     public void updateSalle(Salle salle, String numeroSalle, String typeSalle, StatutSalle statutSalle) {
-        salle.setNumeroSalle(numeroSalle);
-        salle.setTypeSalle(typeSalle);
-        salle.setStatutSalle(statutSalle);
-        salleRepository.saveAndFlush(salle);
+        verifierSalle(numeroSalle, typeSalle, statutSalle);
+
+        Salle salleDb = salleRepository.findById(salle.getId())
+                .orElseThrow(() -> new IllegalArgumentException("Salle introuvable"));
+
+        String numero = numeroSalle.trim().toUpperCase();
+
+        Salle existing = salleRepository.findByNumeroSalle(numero);
+
+        if (existing != null && !existing.getId().equals(salleDb.getId())) {
+            throw new IllegalArgumentException("Ce numéro de salle est déjà utilisé");
+        }
+
+        salleDb.setNumeroSalle(numero);
+        salleDb.setTypeSalle(typeSalle.trim());
+        salleDb.setStatutSalle(statutSalle);
+
+        salleRepository.saveAndFlush(salleDb);
+    }
+
+    private void verifierSalle(String numeroSalle, String typeSalle, StatutSalle statutSalle) {
+        if (numeroSalle == null || numeroSalle.trim().isBlank()) {
+            throw new IllegalArgumentException("Le numéro de salle est obligatoire");
+        }
+
+        if (typeSalle == null || typeSalle.trim().isBlank()) {
+            throw new IllegalArgumentException("Le type de salle est obligatoire");
+        }
+
+        if (statutSalle == null) {
+            throw new IllegalArgumentException("Le statut de salle est obligatoire");
+        }
     }
 
     @Transactional(readOnly = true)
@@ -48,6 +89,9 @@ public class SalleService {
 
     @Transactional
     public void deleteSalle(Salle salle) {
-        salleRepository.delete(salle);
+        Salle salleDb = salleRepository.findById(salle.getId())
+                .orElseThrow(() -> new IllegalArgumentException("Salle introuvable"));
+
+        salleRepository.delete(salleDb);
     }
 }

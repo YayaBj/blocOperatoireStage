@@ -133,53 +133,35 @@ public class SalleListView extends VerticalLayout {
     }
 
     private void saveOrUpdateSalle() {
-        String numero = numeroSalle.getValue().trim().toUpperCase();
-        String type = typeSalle.getValue().trim();
-        StatutSalle statut = statutSalle.getValue();
+        try {
+            if (selectedSalle == null) {
+                salleService.createSalle(
+                        numeroSalle.getValue(),
+                        typeSalle.getValue(),
+                        statutSalle.getValue()
+                );
 
-        if (numero.isBlank()) {
-            numeroSalle.setInvalid(true);
-            numeroSalle.setErrorMessage("Le numéro de salle est obligatoire");
-            return;
+                Notification.show("Salle ajoutée", 3000, Notification.Position.BOTTOM_END)
+                        .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+            } else {
+                salleService.updateSalle(
+                        selectedSalle,
+                        numeroSalle.getValue(),
+                        typeSalle.getValue(),
+                        statutSalle.getValue()
+                );
+
+                Notification.show("Salle modifiée", 3000, Notification.Position.BOTTOM_END)
+                        .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+            }
+
+            refreshGrid();
+            clearForm();
+
+        } catch (IllegalArgumentException e) {
+            Notification.show(e.getMessage(), 4000, Notification.Position.BOTTOM_END)
+                    .addThemeVariants(NotificationVariant.LUMO_ERROR);
         }
-
-        if (salleService.getSalleByNumeroSalle(numero) != null && selectedSalle == null) {
-            numeroSalle.setInvalid(true);
-            numeroSalle.setErrorMessage("Cette salle existe déjà");
-            return;
-        }
-
-        numeroSalle.setInvalid(false);
-
-        if (type.isBlank()) {
-            typeSalle.setInvalid(true);
-            typeSalle.setErrorMessage("Le type de salle est obligatoire");
-            return;
-        }
-
-        typeSalle.setInvalid(false);
-
-        if (statut == null) {
-            statutSalle.setInvalid(true);
-            statutSalle.setErrorMessage("Le statut de salle est obligatoire");
-            return;
-        }
-        statutSalle.setInvalid(false);
-
-        if (selectedSalle == null) {
-            salleService.createSalle(numero, type, statut);
-
-            Notification.show("Salle ajoutée", 3000, Notification.Position.BOTTOM_END)
-                    .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
-        } else {
-            salleService.updateSalle(selectedSalle, numero, type, statut);
-
-            Notification.show("Salle modifiée", 3000, Notification.Position.BOTTOM_END)
-                    .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
-        }
-
-        refreshGrid();
-        clearForm();
     }
 
     private void clearForm() {

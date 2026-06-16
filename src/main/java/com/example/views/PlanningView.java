@@ -452,7 +452,7 @@ public class PlanningView extends VerticalLayout {
             actions.add(terminerBtn);
         }
 
-        if (intervention.getStatutIntervention() != StatutIntervention.ANNULEE) {
+        if (intervention.getStatutIntervention() != StatutIntervention.ANNULEE || intervention.getStatutIntervention() != StatutIntervention.TERMINEE) {
             actions.add(annulerBtn);
         }
 

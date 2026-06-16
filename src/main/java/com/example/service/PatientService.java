@@ -2,7 +2,6 @@ package com.example.service;
 
 import com.example.entity.Patient;
 import com.example.repository.PatientRepository;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,20 +35,23 @@ public class PatientService {
     public void updatePatient(Patient patient, String carteNationalPatient, String nomPatient, String prenomPatient, LocalDate dateNaissance) {
         validerPatient(carteNationalPatient, nomPatient, prenomPatient, dateNaissance);
 
+        Patient patientDb = patientRepository.findById(patient.getId())
+                .orElseThrow(() -> new IllegalArgumentException("Patient introuvable"));
+
         String cn = carteNationalPatient.trim().toUpperCase().replace("-", "");
 
         Patient existingPatient = patientRepository.findByCnPatient(cn);
 
-        if (existingPatient != null && !existingPatient.getId().equals(patient.getId())) {
+        if (existingPatient != null && !existingPatient.getId().equals(patientDb.getId())) {
             throw new IllegalArgumentException("Ce CN est déjà utilisé par un autre patient");
         }
 
-        patient.setCnPatient(cn);
-        patient.setNomPatient(nomPatient.trim());
-        patient.setPrenomPatient(prenomPatient.trim());
-        patient.setDateNaissance(dateNaissance);
+        patientDb.setCnPatient(cn);
+        patientDb.setNomPatient(nomPatient.trim());
+        patientDb.setPrenomPatient(prenomPatient.trim());
+        patientDb.setDateNaissance(dateNaissance);
 
-        patientRepository.saveAndFlush(patient);
+        patientRepository.saveAndFlush(patientDb);
     }
 
     private void validerPatient(String carteNationalPatient, String nomPatient, String prenomPatient, LocalDate dateNaissance) {

@@ -9,6 +9,8 @@ import com.example.repository.DemandeSterilisationRepository;
 import com.example.repository.HistoriqueProcessusRepository;
 import com.example.repository.MachineRepository;
 import com.example.repository.ProcessusSterilisationRepository;
+import com.example.service.sterilisation.state.ProcessusState;
+import com.example.service.sterilisation.state.ProcessusStateFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -110,28 +112,28 @@ public class ProcessusSterilisationService {
     public void avancerProcessus(Long processusId) {
         ProcessusSterilisation processus = findById(processusId);
 
-        if (processus.getStatut() == StatutProcessusSterilisation.TERMINE) {
-            throw new IllegalArgumentException("Ce processus est déjà terminé");
+        ProcessusState stateActuel = ProcessusStateFactory.from(processus.getStatut());
+
+        if (stateActuel.finalState()) {
+            throw new IllegalArgumentException("Impossible d’avancer un processus terminé ou en échec");
         }
 
-        if (processus.getStatut() == StatutProcessusSterilisation.ECHEC) {
-            throw new IllegalArgumentException("Ce processus est en échec");
-        }
+        ProcessusState prochainState = ProcessusStateFactory.from(stateActuel.next());
 
-        StatutProcessusSterilisation prochainStatut = getNextStatut(processus.getStatut());
-        processus.setStatut(prochainStatut);
-        enregistrerMouvementSelonEtape(processus, prochainStatut);
+        processus.setStatut(prochainState.statut());
+
+        enregistrerMouvement(processus, prochainState);
 
         historiqueRepository.save(
                 new HistoriqueProcessus(
                         LocalDateTime.now(),
-                        prochainStatut,
-                        "Passage à l'étape " + prochainStatut,
+                        prochainState.statut(),
+                        prochainState.commentaireHistorique(),
                         processus
                 )
         );
 
-        if (prochainStatut == StatutProcessusSterilisation.TERMINE) {
+        if (prochainState.statut() == StatutProcessusSterilisation.TERMINE) {
             terminerProcessus(processus);
         }
 
@@ -142,13 +144,18 @@ public class ProcessusSterilisationService {
     public void mettreEnEchec(Long processusId, String commentaire) {
         ProcessusSterilisation processus = findById(processusId);
 
-        if (processus.getStatut() == StatutProcessusSterilisation.TERMINE) {
-            throw new IllegalArgumentException("Impossible de mettre en échec un processus terminé");
+        ProcessusState stateActuel = ProcessusStateFactory.from(processus.getStatut());
+
+        if (stateActuel.finalState()) {
+            throw new IllegalArgumentException("Impossible de mettre en échec un processus terminé ou déjà en échec");
         }
 
-        processus.setStatut(StatutProcessusSterilisation.ECHEC);
-        enregistrerMouvementSelonEtape(processus, StatutProcessusSterilisation.ECHEC);
+        ProcessusState echecState = ProcessusStateFactory.from(StatutProcessusSterilisation.ECHEC);
+
+        processus.setStatut(echecState.statut());
         processus.setCommentaire(commentaire);
+
+        enregistrerMouvement(processus, echecState);
 
         processus.getDemandeSterilisation().setStatut(StatutDemandeSterilisation.REFUSEE);
 
@@ -157,9 +164,9 @@ public class ProcessusSterilisationService {
         historiqueRepository.save(
                 new HistoriqueProcessus(
                         LocalDateTime.now(),
-                        StatutProcessusSterilisation.ECHEC,
+                        echecState.statut(),
                         commentaire == null || commentaire.isBlank()
-                                ? "Processus marqué en échec"
+                                ? echecState.commentaireHistorique()
                                 : commentaire,
                         processus
                 )
@@ -172,19 +179,23 @@ public class ProcessusSterilisationService {
         processus.setDateFin(LocalDateTime.now());
         processus.getDemandeSterilisation().setStatut(StatutDemandeSterilisation.TERMINEE);
 
+        mettreBoiteSterile(processus);
+
+        libererMachines(processus);
+    }
+
+    private static void mettreBoiteSterile(ProcessusSterilisation processus) {
         processus.getDemandeSterilisation()
                 .getBoiteChirurgicale()
-                .setStatut(com.example.entity.enums.StatutBoite.EN_STOCK_STERILE);
+                .setStatut(StatutBoite.EN_STOCK_STERILE);
 
         processus.getDemandeSterilisation()
                 .getBoiteChirurgicale()
                 .getMateriels()
                 .forEach(boiteMateriel ->
                         boiteMateriel.getUniteMateriel()
-                                .setEtat(com.example.entity.enums.EtatMateriel.STERILE)
+                                .setEtat(EtatMateriel.STERILE)
                 );
-
-        libererMachines(processus);
     }
 
     private void libererMachines(ProcessusSterilisation processus) {
@@ -203,24 +214,9 @@ public class ProcessusSterilisationService {
     }
 
     private void verifierMachineUtilisable(Machine machine) {
-        if (machine.getStatut() == StatutMachine.MAINTENANCE) {
-            throw new IllegalArgumentException("La machine " + machine.getNom() + " est en maintenance");
+        if (!machine.estUtilisable()) {
+            throw new IllegalArgumentException("La machine " + machine.getNom() + " est en maintenance ou en erreur");
         }
-
-        if (machine.getStatut() == StatutMachine.ERROR) {
-            throw new IllegalArgumentException("La machine " + machine.getNom() + " est en erreur");
-        }
-    }
-
-    private StatutProcessusSterilisation getNextStatut(StatutProcessusSterilisation statut) {
-        return switch (statut) {
-            case EN_ATTENTE -> StatutProcessusSterilisation.LAVAGE;
-            case LAVAGE -> StatutProcessusSterilisation.CONDITIONNEMENT;
-            case CONDITIONNEMENT -> StatutProcessusSterilisation.AUTOCLAVE;
-            case AUTOCLAVE -> StatutProcessusSterilisation.VALIDATION;
-            case VALIDATION -> StatutProcessusSterilisation.TERMINE;
-            default -> statut;
-        };
     }
 
     @Transactional(readOnly = true)
@@ -234,63 +230,18 @@ public class ProcessusSterilisationService {
                 .orElseThrow(() -> new IllegalArgumentException("Processus introuvable"));
     }
 
-    private void enregistrerMouvementSelonEtape(ProcessusSterilisation processus,
-                                                StatutProcessusSterilisation statut) {
-
-        Long boiteId = processus.getDemandeSterilisation()
-                .getBoiteChirurgicale()
-                .getId();
-
-        Long processusId = processus.getId();
-
-        switch (statut) {
-            case LAVAGE -> mouvementBoiteService.enregistrerMouvement(
-                    boiteId,
-                    processusId,
-                    ZoneBoite.STOCK_SALE,
-                    ZoneBoite.LAVAGE,
-                    TypeMouvementBoite.PASSAGE_LAVAGE,
-                    "Boîte envoyée au lavage"
-            );
-
-            case CONDITIONNEMENT -> mouvementBoiteService.enregistrerMouvement(
-                    boiteId,
-                    processusId,
-                    ZoneBoite.LAVAGE,
-                    ZoneBoite.CONDITIONNEMENT,
-                    TypeMouvementBoite.PASSAGE_CONDITIONNEMENT,
-                    "Boîte envoyée au conditionnement"
-            );
-
-            case AUTOCLAVE -> mouvementBoiteService.enregistrerMouvement(
-                    boiteId,
-                    processusId,
-                    ZoneBoite.CONDITIONNEMENT,
-                    ZoneBoite.AUTOCLAVE,
-                    TypeMouvementBoite.PASSAGE_AUTOCLAVE,
-                    "Boîte envoyée à l’autoclave"
-            );
-
-            case TERMINE -> mouvementBoiteService.enregistrerMouvement(
-                    boiteId,
-                    processusId,
-                    ZoneBoite.AUTOCLAVE,
-                    ZoneBoite.STOCK_STERILE,
-                    TypeMouvementBoite.RETOUR_STOCK_STERILE,
-                    "Boîte retournée au stock stérile"
-            );
-
-            case ECHEC -> mouvementBoiteService.enregistrerMouvement(
-                    boiteId,
-                    processusId,
-                    null,
-                    ZoneBoite.QUARANTAINE,
-                    TypeMouvementBoite.MISE_QUARANTAINE,
-                    "Boîte mise en quarantaine après échec"
-            );
-
-            default -> {
-            }
+    private void enregistrerMouvement(ProcessusSterilisation processus, ProcessusState state) {
+        if (!state.hasMovement()) {
+            return;
         }
+
+        mouvementBoiteService.enregistrerMouvement(
+                processus.getDemandeSterilisation().getBoiteChirurgicale().getId(),
+                processus.getId(),
+                state.ancienneZone(),
+                state.nouvelleZone(),
+                state.typeMouvement(),
+                state.commentaireMouvement()
+        );
     }
 }

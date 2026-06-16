@@ -68,4 +68,8 @@ public class Machine {
     public void setDerniereUtilisation(LocalDateTime derniereUtilisation) {
         this.derniereUtilisation = derniereUtilisation;
     }
+
+    public boolean estUtilisable() {
+        return statut != StatutMachine.MAINTENANCE && statut != StatutMachine.ERROR;
+    }
 }
