@@ -1,17 +1,14 @@
 package com.example.views.sterilisation;
 
-import com.example.entity.BoiteChirurgicale;
+import com.example.base.ui.ViewTitle;
 import com.example.entity.DemandeSterilisation;
-import com.example.entity.Intervention;
-import com.example.entity.enums.PrioriteIntervention;
 import com.example.entity.enums.StatutDemandeSterilisation;
 import com.example.service.BoiteChirurgicaleService;
 import com.example.service.DemandeSterilisationService;
 import com.example.service.InterventionService;
+import com.example.views.components.DemandeSterilisationForm;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
-import com.vaadin.flow.component.combobox.ComboBox;
-import com.vaadin.flow.component.datepicker.DatePicker;
 import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.html.Span;
@@ -19,15 +16,15 @@ import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
-import com.vaadin.flow.component.textfield.TextArea;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.router.Menu;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
+import org.jetbrains.annotations.NotNull;
 
 @Route("demandes-sterilisation")
 @PageTitle("Demandes de stérilisation")
-@Menu(order = 9, icon = "icons/clipboard-check.svg", title = "Demandes stérilisation")
+@Menu(order = 8, icon = "icons/clipboard-check.svg", title = "Stérilisation/Demandes")
 public class DemandeSterilisationListView extends VerticalLayout {
 
     private final DemandeSterilisationService demandeService;
@@ -50,12 +47,21 @@ public class DemandeSterilisationListView extends VerticalLayout {
         searchField.setWidth("30em");
         searchField.addValueChangeListener(event -> refreshGrid());
 
-        Button createBtn = new Button("Créer demande", event -> openCreateDialog());
+        Button createBtn = new Button("Créer demande", _ -> openCreateDialog());
         createBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+        createBtn.addClassName("primary-action");
 
-        HorizontalLayout toolbar = new HorizontalLayout(searchField, createBtn);
+        var titleLine = new HorizontalLayout(new ViewTitle("Gestion des demandes"));
+        titleLine.setWidthFull();
+
+        var searchLine = new HorizontalLayout(searchField, createBtn);
+        searchLine.setWidthFull();
+        searchLine.setWrap(true);
+        searchLine.setFlexGrow(1, searchField);
+
+        var toolbar = new VerticalLayout(titleLine, searchLine);
+        toolbar.addClassName("page-toolbar");
         toolbar.setWidthFull();
-        toolbar.setWrap(true);
 
         demandeGrid = new Grid<>();
 
@@ -79,9 +85,11 @@ public class DemandeSterilisationListView extends VerticalLayout {
                 .setHeader("Priorité")
                 .setSortable(true);
 
-        demandeGrid.addColumn(DemandeSterilisation::getStatut)
-                .setHeader("Statut")
-                .setSortable(true);
+        demandeGrid.addComponentColumn(demande -> {
+            Span badge = getStatutBadge(demande);
+
+            return badge;
+        }).setHeader("Statut");
 
         demandeGrid.addComponentColumn(demande -> {
             Button detailsBtn = new Button("Détails", event -> openDetailsDialog(demande));
@@ -115,8 +123,10 @@ public class DemandeSterilisationListView extends VerticalLayout {
 
         demandeGrid.setEmptyStateText("Aucune demande de stérilisation");
         demandeGrid.setSizeFull();
+        demandeGrid.addClassName("professional-grid");
 
         setSizeFull();
+        addClassName("page-container");
         add(toolbar, demandeGrid);
         refreshGrid();
     }
@@ -124,94 +134,132 @@ public class DemandeSterilisationListView extends VerticalLayout {
     private void openCreateDialog() {
         Dialog dialog = new Dialog();
         dialog.setHeaderTitle("Créer une demande de stérilisation");
+        dialog.setWidth("900px");
+        dialog.setMaxWidth("95vw");
 
-        TextField codeDemande = new TextField("Code demande");
+        DemandeSterilisationForm form = new DemandeSterilisationForm(
+                boiteService.findAll(),
+                interventionService.findAll(),
+                data -> {
+                    try {
+                        demandeService.createDemande(
+                                data.codeDemande(),
+                                data.dateSouhaitee(),
+                                data.priorite(),
+                                data.boiteId(),
+                                data.interventionId(),
+                                data.commentaire()
+                        );
 
-        DatePicker dateSouhaitee = new DatePicker("Date souhaitée");
+                        Notification.show("Demande créée", 3000, Notification.Position.BOTTOM_END)
+                                .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
 
-        ComboBox<PrioriteIntervention> priorite = new ComboBox<>("Priorité");
-        priorite.setItems(PrioriteIntervention.values());
+                        refreshGrid();
+                        dialog.close();
 
-        ComboBox<BoiteChirurgicale> boite = new ComboBox<>("Boîte chirurgicale");
-        boite.setItems(boiteService.findAll());
-        boite.setItemLabelGenerator(b -> b.getCodeBoite() + " - " + b.getNom());
-
-        ComboBox<Intervention> intervention = new ComboBox<>("Intervention liée");
-        intervention.setItems(interventionService.findAll());
-        intervention.setItemLabelGenerator(i ->
-                "#" + i.getId() + " - " + i.getTypeIntervention()
-        );
-        intervention.setClearButtonVisible(true);
-
-        TextArea commentaire = new TextArea("Commentaire");
-        commentaire.setWidthFull();
-
-        Button saveBtn = new Button("Créer", event -> {
-            try {
-                Long interventionId = intervention.getValue() == null
-                        ? null
-                        : intervention.getValue().getId();
-
-                demandeService.createDemande(
-                        codeDemande.getValue(),
-                        dateSouhaitee.getValue(),
-                        priorite.getValue(),
-                        boite.getValue() == null ? null : boite.getValue().getId(),
-                        interventionId,
-                        commentaire.getValue()
-                );
-
-                Notification.show("Demande créée", 3000, Notification.Position.BOTTOM_END)
-                        .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
-
-                refreshGrid();
-                dialog.close();
-
-            } catch (IllegalArgumentException e) {
-                Notification.show(e.getMessage(), 4000, Notification.Position.BOTTOM_END)
-                        .addThemeVariants(NotificationVariant.LUMO_ERROR);
-            }
-        });
-        saveBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
-
-        Button cancelBtn = new Button("Annuler", event -> dialog.close());
-
-        VerticalLayout layout = new VerticalLayout(
-                codeDemande,
-                dateSouhaitee,
-                priorite,
-                boite,
-                intervention,
-                commentaire,
-                new HorizontalLayout(saveBtn, cancelBtn)
+                    } catch (IllegalArgumentException e) {
+                        Notification.show(e.getMessage(), 4000, Notification.Position.BOTTOM_END)
+                                .addThemeVariants(NotificationVariant.LUMO_ERROR);
+                    }
+                }
         );
 
-        layout.setWidth("650px");
-
-        dialog.add(layout);
+        dialog.add(form);
         dialog.open();
     }
 
     private void openDetailsDialog(DemandeSterilisation demande) {
         Dialog dialog = new Dialog();
         dialog.setHeaderTitle("Détails demande : " + demande.getCodeDemande());
+        dialog.setWidth("750px");
+        dialog.setMaxWidth("95vw");
 
-        VerticalLayout layout = new VerticalLayout(
-                new Span("Code : " + demande.getCodeDemande()),
-                new Span("Boîte : " + demande.getBoiteChirurgicale().getCodeBoite() + " - " + demande.getBoiteChirurgicale().getNom()),
-                new Span("Date demande : " + demande.getDateDemande()),
-                new Span("Date souhaitée : " + demande.getDateSouhaitee()),
-                new Span("Priorité : " + demande.getPriorite()),
-                new Span("Statut : " + demande.getStatut()),
-                new Span("Commentaire : " + (demande.getCommentaire() == null ? "" : demande.getCommentaire()))
+        Span statutBadge = getStatutBadge(demande);
+
+        VerticalLayout content = new VerticalLayout();
+        content.addClassName("intervention-form");
+        content.setWidthFull();
+
+        com.vaadin.flow.component.html.Div section = new com.vaadin.flow.component.html.Div();
+        section.addClassName("form-section");
+
+        Span title = new Span("Informations de la demande");
+        title.addClassName("form-section-title");
+
+        Span description = new Span("Résumé des informations liées à la demande de stérilisation.");
+        description.addClassName("form-section-description");
+
+        section.add(
+                title,
+                description,
+                createDetailLine("Code", demande.getCodeDemande()),
+                createDetailLine(
+                        "Boîte",
+                        demande.getBoiteChirurgicale().getCodeBoite()
+                                + " - "
+                                + demande.getBoiteChirurgicale().getNom()
+                ),
+                createDetailLine("Date demande", String.valueOf(demande.getDateDemande())),
+                createDetailLine("Date souhaitée", String.valueOf(demande.getDateSouhaitee())),
+                createDetailLine("Priorité", String.valueOf(demande.getPriorite())),
+                createDetailLine("Statut", ""),
+                statutBadge,
+                createDetailLine("Commentaire", nullSafe(demande.getCommentaire()))
         );
 
         Button closeBtn = new Button("Fermer", event -> dialog.close());
-        layout.add(closeBtn);
-        layout.setWidth("600px");
+        closeBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+        closeBtn.addClassName("primary-action");
 
-        dialog.add(layout);
+        HorizontalLayout actions = new HorizontalLayout(closeBtn);
+        actions.addClassName("form-actions");
+        actions.setWidthFull();
+
+        content.add(section, actions);
+
+        dialog.add(content);
         dialog.open();
+    }
+
+    @NotNull
+    private static Span getStatutBadge(DemandeSterilisation demande) {
+        Span statutBadge = new Span(demande.getStatut() == null ? "" : demande.getStatut().name());
+
+        if (demande.getStatut() == null) {
+            statutBadge.addClassName("status-neutral");
+        } else {
+            switch (demande.getStatut()) {
+                case BROUILLON -> statutBadge.addClassName("status-neutral");
+                case ENVOYEE, EN_COURS -> statutBadge.addClassName("status-info");
+                case ACCEPTEE, TERMINEE -> statutBadge.addClassName("status-success");
+                case REFUSEE, ANNULEE -> statutBadge.addClassName("status-danger");
+            }
+        }
+        return statutBadge;
+    }
+
+    private HorizontalLayout createDetailLine(String label, String value) {
+        Span labelSpan = new Span(label + " :");
+        labelSpan.getStyle()
+                .set("font-weight", "600")
+                .set("color", "#334155")
+                .set("min-width", "130px");
+
+        Span valueSpan = new Span(value == null || value.isBlank() ? "-" : value);
+        valueSpan.getStyle()
+                .set("color", "#0f172a")
+                .set("white-space", "normal")
+                .set("word-break", "break-word");
+
+        HorizontalLayout line = new HorizontalLayout(labelSpan, valueSpan);
+        line.setWidthFull();
+        line.setSpacing(true);
+
+        return line;
+    }
+
+    private String nullSafe(String value) {
+        return value == null ? "" : value;
     }
 
     private void executeAction(Runnable action, String successMessage) {
@@ -228,6 +276,23 @@ public class DemandeSterilisationListView extends VerticalLayout {
         }
     }
 
+    private boolean matchesSearch(DemandeSterilisation d, String search) {
+        String code = nullSafe(d.getCodeDemande()).toLowerCase();
+        String boite = d.getBoiteChirurgicale() == null ? "" : d.getBoiteChirurgicale().getCodeBoite().toLowerCase();
+        String priorite = d.getPriorite() == null ? "" : d.getPriorite().name().toLowerCase();
+        String statut = d.getStatut() == null ? "" : d.getStatut().name().toLowerCase();
+        String dateDemande = d.getDateDemande() == null ? "" : d.getDateDemande().toString();
+        String dateSouhaitee = d.getDateSouhaitee() == null ? "" : d.getDateSouhaitee().toString();
+
+        return search.isBlank()
+                || code.contains(search)
+                || boite.contains(search)
+                || priorite.contains(search)
+                || statut.contains(search)
+                || dateDemande.contains(search)
+                || dateSouhaitee.contains(search);
+    }
+
     private void refreshGrid() {
         String search = searchField.getValue() == null
                 ? ""
@@ -235,22 +300,7 @@ public class DemandeSterilisationListView extends VerticalLayout {
 
         demandeGrid.setItems(
                 demandeService.findAll().stream()
-                        .filter(d -> {
-                            String code = d.getCodeDemande() == null ? "" : d.getCodeDemande().toLowerCase();
-                            String boite = d.getBoiteChirurgicale() == null ? "" : d.getBoiteChirurgicale().getCodeBoite().toLowerCase();
-                            String priorite = d.getPriorite() == null ? "" : d.getPriorite().name().toLowerCase();
-                            String statut = d.getStatut() == null ? "" : d.getStatut().name().toLowerCase();
-                            String dateDemande = d.getDateDemande() == null ? "" : d.getDateDemande().toString();
-                            String dateSouhaitee = d.getDateSouhaitee() == null ? "" : d.getDateSouhaitee().toString();
-
-                            return search.isBlank()
-                                    || code.contains(search)
-                                    || boite.contains(search)
-                                    || priorite.contains(search)
-                                    || statut.contains(search)
-                                    || dateDemande.contains(search)
-                                    || dateSouhaitee.contains(search);
-                        })
+                        .filter(d -> matchesSearch(d, search))
                         .toList()
         );
     }

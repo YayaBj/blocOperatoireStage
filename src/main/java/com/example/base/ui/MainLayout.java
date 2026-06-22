@@ -12,7 +12,6 @@ import com.vaadin.flow.component.orderedlayout.*;
 import com.vaadin.flow.component.sidenav.SideNav;
 import com.vaadin.flow.component.sidenav.SideNavItem;
 import com.vaadin.flow.router.Layout;
-import com.vaadin.flow.server.menu.MenuConfiguration;
 import com.vaadin.flow.server.menu.MenuEntry;
 
 @Layout
@@ -46,22 +45,28 @@ public final class MainLayout extends AppLayout {
 
     private SideNav createSideNav() {
         var nav = new SideNav();
-        nav.setMinWidth(200, Unit.PIXELS);
-        MenuConfiguration.getMenuEntries().forEach(entry -> nav.addItem(createSideNavItem(entry)));
-        return nav;
-    }
+        nav.setMinWidth(220, Unit.PIXELS);
 
-    private SideNavItem createSideNavItem(MenuEntry menuEntry) {
-        if (menuEntry.icon() != null) {
-            Component icon = null;
-            if (menuEntry.icon().contains(".svg")) {
-                icon = new SvgIcon(menuEntry.icon());
-            } else {
-                icon = new Icon(menuEntry.icon());
-            }
-            return new SideNavItem(menuEntry.title(), menuEntry.path(), icon);
-        } else {
-            return new SideNavItem(menuEntry.title(), menuEntry.path());
-        }
+        nav.addItem(new SideNavItem("Planning", "", new SvgIcon("icons/calendar.svg")));
+
+        SideNavItem donneesBase = new SideNavItem("Données de base");
+        donneesBase.addItem(new SideNavItem("Patients", "patients", new SvgIcon("icons/user.svg")));
+        donneesBase.addItem(new SideNavItem("Personnel", "personnels", new SvgIcon("icons/users.svg")));
+        donneesBase.addItem(new SideNavItem("Salles", "salles", new SvgIcon("icons/building.svg")));
+        donneesBase.addItem(new SideNavItem("Matériel", "materiels", new SvgIcon("icons/package.svg")));
+
+        SideNavItem bloc = new SideNavItem("Bloc opératoire");
+        bloc.addItem(new SideNavItem("Interventions", "interventions"));
+        bloc.addItem(new SideNavItem("Boîtes chirurgicales", "boites", new SvgIcon("icons/box.svg")));
+
+        SideNavItem sterilisation = new SideNavItem("Stérilisation");
+        sterilisation.addItem(new SideNavItem("Demandes", "demandes-sterilisation", new SvgIcon("icons/clipboard-check.svg")));
+        sterilisation.addItem(new SideNavItem("Machines", "machines", new SvgIcon("icons/settings.svg")));
+        sterilisation.addItem(new SideNavItem("Processus", "processus-sterilisation", new SvgIcon("icons/refresh.svg")));
+        sterilisation.addItem(new SideNavItem("Mouvements", "mouvements-boites", new SvgIcon("icons/arrows-right-left.svg")));
+
+        nav.addItem(donneesBase, bloc, sterilisation);
+
+        return nav;
     }
 }

@@ -1,17 +1,16 @@
 package com.example.views.boite;
 
+import com.example.base.ui.ViewTitle;
 import com.example.entity.BoiteChirurgicale;
 import com.example.entity.BoiteMateriel;
 import com.example.entity.MouvementBoite;
-import com.example.entity.UniteMateriel;
-import com.example.entity.enums.PrioriteIntervention;
 import com.example.service.BoiteChirurgicaleService;
 import com.example.service.MouvementBoiteService;
 import com.example.service.UniteMaterielService;
+import com.example.views.components.BoiteForm;
+import com.example.views.components.GridDialog;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
-import com.vaadin.flow.component.combobox.ComboBox;
-import com.vaadin.flow.component.combobox.MultiSelectComboBox;
 import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.html.Span;
@@ -24,9 +23,11 @@ import com.vaadin.flow.router.Menu;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 
+import java.util.List;
+
 @Route("boites")
 @PageTitle("Boîtes chirurgicales")
-@Menu(order = 8, icon = "icons/box.svg", title = "Boîtes")
+@Menu(order = 7, icon = "icons/box.svg", title = "Bloc opératoire/Boîtes chirurgicales")
 public class BoiteChirurgicaleListView extends VerticalLayout {
 
     private final BoiteChirurgicaleService boiteService;
@@ -49,14 +50,23 @@ public class BoiteChirurgicaleListView extends VerticalLayout {
         searchField.setPlaceholder("Rechercher par code, nom, priorité, département ou spécialité");
         searchField.setClearButtonVisible(true);
         searchField.setWidth("30em");
-        searchField.addValueChangeListener(event -> refreshGrid());
+        searchField.addValueChangeListener(_ -> refreshGrid());
 
-        Button createBtn = new Button("Créer boîte", event -> openCreateDialog());
+        Button createBtn = new Button("Créer boîte", _ -> openCreateDialog());
         createBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+        createBtn.addClassName("primary-action");
 
-        HorizontalLayout toolbar = new HorizontalLayout(searchField, createBtn);
+        var titleLine = new HorizontalLayout(new ViewTitle("Gestion des boîtes chirurgicales"));
+        titleLine.setWidthFull();
+
+        var searchLine = new HorizontalLayout(searchField, createBtn);
+        searchLine.setWidthFull();
+        searchLine.setWrap(true);
+        searchLine.setFlexGrow(1, searchField);
+
+        var toolbar = new VerticalLayout(titleLine, searchLine);
+        toolbar.addClassName("page-toolbar");
         toolbar.setWidthFull();
-        toolbar.setWrap(true);
 
         boiteGrid = new Grid<>();
 
@@ -72,9 +82,18 @@ public class BoiteChirurgicaleListView extends VerticalLayout {
                 .setHeader("Priorité")
                 .setSortable(true);
 
-        boiteGrid.addColumn(BoiteChirurgicale::getStatut)
-                .setHeader("Statut")
-                .setSortable(true);
+        boiteGrid.addComponentColumn(boite -> {
+            Span badge = new Span(boite.getStatut().name());
+
+            switch (boite.getStatut()) {
+                case ACTIVE -> badge.addClassName("status-success");
+                case EN_STERILISATION -> badge.addClassName("status-info");
+                case INCIDENT -> badge.addClassName("status-danger");
+                default -> badge.addClassName("status-neutral");
+            }
+
+            return badge;
+        }).setHeader("Statut");
 
         boiteGrid.addColumn(BoiteChirurgicale::getDepartement)
                 .setHeader("Département")
@@ -89,17 +108,17 @@ public class BoiteChirurgicaleListView extends VerticalLayout {
                 .setSortable(true);
 
         boiteGrid.addComponentColumn(boite -> {
-            Button voirBtn = new Button("Voir contenu");
-            voirBtn.addClickListener(event -> openContenuDialog(boite));
+            Button voirBtn = new Button("Voir");
+            voirBtn.addClickListener(_ -> openContenuDialog(boite));
 
             Button modifierBtn = new Button("Modifier");
-            modifierBtn.addClickListener(event -> openEditDialog(boite));
+            modifierBtn.addClickListener(_ -> openEditDialog(boite));
 
             Button supprimerBtn = new Button("Supprimer");
-            supprimerBtn.addClickListener(event -> openDeleteDialog(boite));
+            supprimerBtn.addClickListener(_ -> openDeleteDialog(boite));
 
             Button mouvementsBtn = new Button("Mouvements");
-            mouvementsBtn.addClickListener(event -> openMouvementsDialog(boite));
+            mouvementsBtn.addClickListener(_ -> openMouvementsDialog(boite));
 
             HorizontalLayout actions = new HorizontalLayout(voirBtn, mouvementsBtn, modifierBtn, supprimerBtn);
             actions.setWrap(false);
@@ -112,7 +131,13 @@ public class BoiteChirurgicaleListView extends VerticalLayout {
         boiteGrid.setWidthFull();
         boiteGrid.getStyle().set("overflow-x", "auto");
 
+        toolbar.addClassName("page-toolbar");
+        createBtn.addClassName("primary-action");
+
+        boiteGrid.addClassName("professional-grid");
+
         setSizeFull();
+        addClassName("page-container");
         add(toolbar, boiteGrid);
 
         refreshGrid();
@@ -121,95 +146,64 @@ public class BoiteChirurgicaleListView extends VerticalLayout {
     private void openCreateDialog() {
         Dialog dialog = new Dialog();
         dialog.setHeaderTitle("Créer une boîte chirurgicale");
+        dialog.setWidth("900px");
+        dialog.setMaxWidth("95vw");
 
-        TextField codeBoite = new TextField("Code boîte");
-        TextField nom = new TextField("Nom");
-        TextField departement = new TextField("Département");
-        TextField specialite = new TextField("Spécialité");
+        BoiteForm form = new BoiteForm(
+                uniteMaterielService.findAll(),
+                null,
+                List.of(),
+                "Créer la boîte",
+                data -> {
+                    try {
+                        boiteService.createBoite(
+                                data.codeBoite(),
+                                data.nom(),
+                                data.priorite(),
+                                data.departement(),
+                                data.specialite(),
+                                data.uniteMaterielIds()
+                        );
 
-        ComboBox<PrioriteIntervention> priorite = new ComboBox<>("Priorité");
-        priorite.setItems(PrioriteIntervention.values());
+                        Notification.show("Boîte créée", 3000, Notification.Position.BOTTOM_END)
+                                .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
 
-        MultiSelectComboBox<UniteMateriel> materiels = new MultiSelectComboBox<>("Matériels");
-        materiels.setItems(uniteMaterielService.findAll());
-        materiels.setItemLabelGenerator(unite ->
-                unite.getCodeInventaire() + " - " + unite.getMateriel().getNomMateriel()
+                        refreshGrid();
+                        dialog.close();
+
+                    } catch (IllegalArgumentException e) {
+                        Notification.show(e.getMessage(), 4000, Notification.Position.BOTTOM_END)
+                                .addThemeVariants(NotificationVariant.LUMO_ERROR);
+                    }
+                }
         );
 
-        Button saveBtn = new Button("Créer", event -> {
-            try {
-                boiteService.createBoite(
-                        codeBoite.getValue(),
-                        nom.getValue(),
-                        priorite.getValue(),
-                        departement.getValue(),
-                        specialite.getValue(),
-                        materiels.getValue().stream()
-                                .map(UniteMateriel::getId)
-                                .toList()
-                );
-
-                Notification.show("Boîte créée", 3000, Notification.Position.BOTTOM_END)
-                        .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
-
-                refreshGrid();
-                dialog.close();
-
-            } catch (IllegalArgumentException e) {
-                Notification.show(e.getMessage(), 4000, Notification.Position.BOTTOM_END)
-                        .addThemeVariants(NotificationVariant.LUMO_ERROR);
-            }
-        });
-        saveBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
-
-        Button cancelBtn = new Button("Annuler", event -> dialog.close());
-
-        VerticalLayout layout = new VerticalLayout(
-                codeBoite,
-                nom,
-                departement,
-                specialite,
-                priorite,
-                materiels,
-                new HorizontalLayout(saveBtn, cancelBtn)
-        );
-
-        layout.setWidth("600px");
-
-        dialog.add(layout);
+        dialog.add(form);
         dialog.open();
     }
 
     private void openContenuDialog(BoiteChirurgicale boite) {
-        Dialog dialog = new Dialog();
-        dialog.setHeaderTitle("Contenu de la boîte : " + boite.getNom());
-
         Grid<BoiteMateriel> contenuGrid = new Grid<>();
 
         contenuGrid.addColumn(bm -> bm.getUniteMateriel().getCodeInventaire())
                 .setHeader("Code inventaire")
-                .setSortable(true);
+                .setAutoWidth(true);
 
         contenuGrid.addColumn(bm -> bm.getUniteMateriel().getMateriel().getNomMateriel())
                 .setHeader("Matériel")
-                .setSortable(true);
+                .setFlexGrow(1);
 
         contenuGrid.addColumn(bm -> bm.getUniteMateriel().getEtat())
                 .setHeader("État")
-                .setSortable(true);
+                .setAutoWidth(true);
 
         contenuGrid.setItems(boiteService.findMaterielsByBoite(boite));
         contenuGrid.setEmptyStateText("Aucun matériel dans cette boîte");
-        contenuGrid.setSizeFull();
 
-        Button closeBtn = new Button("Fermer", event -> dialog.close());
-
-        VerticalLayout layout = new VerticalLayout(contenuGrid, closeBtn);
-        layout.setWidth("700px");
-        layout.setHeight("500px");
-
-        dialog.add(layout);
-        dialog.open();
+        new GridDialog<>(
+                "Contenu de la boîte : " + boite.getNom(),
+                contenuGrid
+        ).open();
     }
 
     private void refreshGrid() {
@@ -242,83 +236,46 @@ public class BoiteChirurgicaleListView extends VerticalLayout {
     private void openEditDialog(BoiteChirurgicale boite) {
         Dialog dialog = new Dialog();
         dialog.setHeaderTitle("Modifier la boîte");
-
-        TextField codeBoite = new TextField("Code boîte");
-        codeBoite.setValue(boite.getCodeBoite());
-
-        TextField nom = new TextField("Nom");
-        nom.setValue(boite.getNom());
-
-        TextField departement = new TextField("Département");
-        departement.setValue(boite.getDepartement() == null ? "" : boite.getDepartement());
-
-        TextField specialite = new TextField("Spécialité");
-        specialite.setValue(boite.getSpecialite() == null ? "" : boite.getSpecialite());
-
-        ComboBox<PrioriteIntervention> priorite = new ComboBox<>("Priorité");
-        priorite.setItems(PrioriteIntervention.values());
-        priorite.setValue(boite.getPriorite());
-
-        MultiSelectComboBox<UniteMateriel> materiels = new MultiSelectComboBox<>("Matériels");
-        materiels.setItems(uniteMaterielService.findAll());
-        materiels.setItemLabelGenerator(unite ->
-                unite.getCodeInventaire() + " - " + unite.getMateriel().getNomMateriel()
-        );
+        dialog.setWidth("900px");
+        dialog.setMaxWidth("95vw");
 
         var allUnites = uniteMaterielService.findAll();
-        materiels.setItems(allUnites);
 
         var selectedIds = boiteService.findMaterielsByBoite(boite).stream()
                 .map(bm -> bm.getUniteMateriel().getId())
                 .toList();
 
-        materiels.select(
-                allUnites.stream()
-                        .filter(unite -> selectedIds.contains(unite.getId()))
-                        .toList()
+        BoiteForm form = new BoiteForm(
+                allUnites,
+                boite,
+                selectedIds,
+                "Modifier la boîte",
+                data -> {
+                    try {
+                        boiteService.updateBoite(
+                                boite,
+                                data.codeBoite(),
+                                data.nom(),
+                                data.priorite(),
+                                data.departement(),
+                                data.specialite(),
+                                data.uniteMaterielIds()
+                        );
+
+                        Notification.show("Boîte modifiée", 3000, Notification.Position.BOTTOM_END)
+                                .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+
+                        refreshGrid();
+                        dialog.close();
+
+                    } catch (IllegalArgumentException e) {
+                        Notification.show(e.getMessage(), 4000, Notification.Position.BOTTOM_END)
+                                .addThemeVariants(NotificationVariant.LUMO_ERROR);
+                    }
+                }
         );
 
-        Button saveBtn = new Button("Modifier", event -> {
-            try {
-                boiteService.updateBoite(
-                        boite,
-                        codeBoite.getValue(),
-                        nom.getValue(),
-                        priorite.getValue(),
-                        departement.getValue(),
-                        specialite.getValue(),
-                        materiels.getValue().stream()
-                                .map(UniteMateriel::getId)
-                                .toList()
-                );
-
-                Notification.show("Boîte modifiée", 3000, Notification.Position.BOTTOM_END)
-                        .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
-
-                refreshGrid();
-                dialog.close();
-
-            } catch (IllegalArgumentException e) {
-                Notification.show(e.getMessage(), 4000, Notification.Position.BOTTOM_END)
-                        .addThemeVariants(NotificationVariant.LUMO_ERROR);
-            }
-        });
-
-        Button cancelBtn = new Button("Annuler", event -> dialog.close());
-
-        VerticalLayout layout = new VerticalLayout(
-                codeBoite,
-                nom,
-                departement,
-                specialite,
-                priorite,
-                materiels,
-                new HorizontalLayout(saveBtn, cancelBtn)
-        );
-
-        layout.setWidth("600px");
-
-        dialog.add(layout);
+        dialog.add(form);
         dialog.open();
     }
 
@@ -353,42 +310,42 @@ public class BoiteChirurgicaleListView extends VerticalLayout {
     }
 
     private void openMouvementsDialog(BoiteChirurgicale boite) {
-        Dialog dialog = new Dialog();
-        dialog.setHeaderTitle("Mouvements de la boîte : " + boite.getCodeBoite());
-
         Grid<MouvementBoite> mouvementGrid = new Grid<>();
 
         mouvementGrid.addColumn(MouvementBoite::getDateMouvement)
                 .setHeader("Date")
-                .setSortable(true);
+                .setAutoWidth(true);
 
         mouvementGrid.addColumn(MouvementBoite::getAncienneZone)
                 .setHeader("Ancienne zone")
-                .setSortable(true);
+                .setAutoWidth(true);
 
         mouvementGrid.addColumn(MouvementBoite::getNouvelleZone)
                 .setHeader("Nouvelle zone")
-                .setSortable(true);
+                .setAutoWidth(true);
 
         mouvementGrid.addColumn(MouvementBoite::getTypeMouvement)
                 .setHeader("Type")
-                .setSortable(true);
+                .setAutoWidth(true);
 
-        mouvementGrid.addColumn(MouvementBoite::getCommentaire)
-                .setHeader("Commentaire");
+        mouvementGrid.addComponentColumn(m -> {
+                    Span span = new Span(m.getCommentaire());
+
+                    span.getElement().setProperty(
+                            "title",
+                            m.getCommentaire() == null ? "" : m.getCommentaire()
+                    );
+
+                    return span;
+                }).setHeader("Commentaire")
+                .setFlexGrow(3);
 
         mouvementGrid.setItems(mouvementBoiteService.findByBoite(boite.getId()));
         mouvementGrid.setEmptyStateText("Aucun mouvement pour cette boîte");
-        mouvementGrid.setSizeFull();
 
-        Button closeBtn = new Button("Fermer", event -> dialog.close());
-
-        VerticalLayout layout = new VerticalLayout(mouvementGrid, closeBtn);
-        layout.setSizeFull();
-
-        dialog.setWidth("900px");
-        dialog.setHeight("600px");
-        dialog.add(layout);
-        dialog.open();
+        new GridDialog<>(
+                "Mouvements de la boîte : " + boite.getCodeBoite(),
+                mouvementGrid
+        ).open();
     }
 }

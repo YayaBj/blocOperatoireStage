@@ -1,0 +1,257 @@
+/* ===== Global medical theme ===== */
+
+html {
+    --lumo-primary-color: #0f766e;
+    --lumo-primary-color-50pct: rgba(15, 118, 110, 0.5);
+    --lumo-primary-color-10pct: rgba(15, 118, 110, 0.1);
+
+    --lumo-error-color: #dc2626;
+    --lumo-success-color: #059669;
+
+    --app-bg: #f4f8fb;
+    --app-card-bg: #ffffff;
+    --app-border: #e2e8f0;
+    --app-text-muted: #64748b;
+    --app-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+}
+
+/* Fond général */
+    vaadin-app-layout::part(drawer) {
+    background: #ffffff;
+    border-right: 1px solid var(--app-border);
+}
+
+vaadin-app-layout::part(content) {
+    background: var(--app-bg);
+}
+
+/* Header logo */
+.app-name {
+    font-weight: 700;
+    font-size: 15px;
+    color: #0f172a;
+}
+
+.app-logo {
+    background: var(--lumo-primary-color);
+}
+
+/* Sidebar */
+vaadin-side-nav {
+    padding: 8px 12px;
+}
+
+vaadin-side-nav-item::part(link) {
+    border-radius: 10px;
+    padding: 8px 12px;
+    color: #334155;
+    font-weight: 500;
+}
+
+vaadin-side-nav-item[current]::part(link) {
+    background: var(--lumo-primary-color-10pct);
+    color: var(--lumo-primary-color);
+    font-weight: 700;
+}
+
+vaadin-side-nav-item::part(children) {
+    padding-left: 10px;
+}
+
+/* Layout des pages */
+.page-container {
+    padding: 24px;
+    gap: 18px;
+    background: var(--app-bg);
+}
+
+/* Barre recherche/actions */
+.page-toolbar {
+    background: var(--app-card-bg);
+    border: 1px solid var(--app-border);
+    border-radius: 16px;
+    padding: 16px;
+    box-shadow: var(--app-shadow);
+    align-items: center;
+}
+
+/* Grids */
+.professional-grid {
+    background: var(--app-card-bg);
+    border: 1px solid var(--app-border);
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: var(--app-shadow);
+}
+
+.status-success {
+    background: #dcfce7;
+    color: #166534;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-weight: 600;
+}
+
+.status-info {
+    background: #dbeafe;
+    color: #1d4ed8;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-weight: 600;
+}
+
+.status-danger {
+    background: #fee2e2;
+    color: #b91c1c;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-weight: 600;
+}
+
+.status-neutral {
+    background: #f1f5f9;
+    color: #475569;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-weight: 600;
+}
+
+.intervention-form vaadin-text-field,
+.intervention-form vaadin-combo-box,
+.intervention-form vaadin-date-time-picker,
+.intervention-form vaadin-integer-field,
+.intervention-form vaadin-multi-select-combo-box {
+    min-width: 220px;
+}
+
+.form-section-title {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: #0f172a;
+    margin-bottom: 15px;
+}
+
+.form-actions {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.primary-action {
+    min-width: 220px;
+    height: 46px;
+    border-radius: 12px;
+    font-weight: 600;
+}
+
+.intervention-form {
+    gap: 18px;
+    padding: 0;
+    background: transparent;
+}
+
+.form-section {
+    width: 100%;
+    box-sizing: border-box;
+
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+
+    background: white;
+    border-radius: 18px;
+    padding: 20px;
+
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.05);
+}
+
+.form-section-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.form-section-description {
+    font-size: 13px;
+    color: #64748b;
+    margin-top: -8px;
+}
+
+.form-row {
+    gap: 14px;
+}
+
+.form-row > * {
+    min-width: 220px;
+}
+
+.form-actions {
+    justify-content: flex-end;
+    padding-top: 4px;
+}
+
+.planning-calendar-card {
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+
+    background: white;
+    border: 1px solid var(--app-border);
+    border-radius: 18px;
+    padding: 16px;
+    box-shadow: var(--app-shadow);
+    overflow: hidden;
+}
+
+.planning-calendar {
+    height: 100%;
+}
+
+.planning-calendar-card .fc {
+    height: 100%;
+    font-family: inherit;
+}
+
+.planning-calendar-card .fc-toolbar-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.planning-calendar-card .fc-button {
+    background: var(--lumo-primary-color);
+    border: none;
+    border-radius: 10px;
+    font-weight: 600;
+}
+
+.planning-calendar-card .fc-event {
+    border: none;
+    border-radius: 8px;
+    padding: 2px 4px;
+    background: var(--lumo-primary-color);
+    box-shadow: 0 2px 8px rgba(15, 118, 110, 0.25);
+}
+
+.planning-calendar-card .fc-col-header-cell {
+    background: #f8fafc;
+    color: #334155;
+    font-weight: 700;
+}
+
+.planning-calendar-card .fc-timegrid-slot {
+    background: #ffffff;
+}
+
+.planning-calendar-card .fc-day-today {
+    background: rgba(15, 118, 110, 0.06);
+}
+
+vaadin-grid {
+    min-width: 100%;
+}
+
+.grid-action-menu vaadin-menu-bar-button {
+    border-radius: 10px;
+    font-weight: 600;
+}

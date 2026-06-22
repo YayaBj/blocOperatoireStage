@@ -3,9 +3,10 @@ package com.example.views.patient;
 import com.example.base.ui.ViewTitle;
 import com.example.entity.Patient;
 import com.example.service.PatientService;
+import com.example.views.components.ConfirmDeleteDialog;
+import com.example.views.components.PatientForm;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
-import com.vaadin.flow.component.datepicker.DatePicker;
 import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.notification.Notification;
@@ -23,61 +24,38 @@ import java.util.Optional;
 
 @Route(value = "patients")
 @PageTitle("Gestion des patients")
-@Menu(order = 1, icon = "icons/user.svg", title = "Patients")
+@Menu(order = 2, icon = "icons/user.svg", title = "Données de base/Patients")
 public class PatientListView extends VerticalLayout {
 
     private final PatientService patientService;
 
-    final TextField cnPatient;
-    final TextField nomPatient;
-    final TextField prenomPatient;
-    final DatePicker dateNaissance;
-    final Button createBtn;
-    final Button cancelBtn;
     final TextField searchField;
     final Grid<Patient> patientGrid;
-
-    private Patient selectedPatient = null;
 
     public PatientListView(PatientService patientService) {
         this.patientService = patientService;
 
-        cnPatient = new TextField();
-        cnPatient.setPlaceholder("Numéro carte national");
-
-        nomPatient = new TextField();
-        nomPatient.setPlaceholder("Nom");
-
-        prenomPatient = new TextField();
-        prenomPatient.setPlaceholder("Prénom");
-
-        dateNaissance = new DatePicker();
-        dateNaissance.setPlaceholder("Date de naissance");
-
-        createBtn = new Button("Ajouter", _ -> saveOrUpdatePatient());
-        createBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
-
-        cancelBtn = new Button("Annuler", _ -> clearForm());
-        cancelBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
-        cancelBtn.setVisible(false);
-
         searchField = new TextField();
         searchField.setPlaceholder("Rechercher par CN, nom ou prénom");
         searchField.setClearButtonVisible(true);
-        searchField.setWidth("18em");
+        searchField.setWidth("30em");
+        searchField.addValueChangeListener(_ -> refreshGrid());
 
-        var toolbar = new VerticalLayout();
-        var gestionPatient = new HorizontalLayout();
-        gestionPatient.add(new ViewTitle("Gestion des patients"), cnPatient, nomPatient, prenomPatient, dateNaissance, createBtn, cancelBtn);
-        gestionPatient.setFlexGrow(1, cnPatient, nomPatient, prenomPatient, dateNaissance);
-        gestionPatient.setWrap(true);
-        gestionPatient.setWidthFull();
-        var searchLine = new HorizontalLayout();
-        searchLine.add(searchField);
-        searchLine.setFlexGrow(1, searchField);
-        searchLine.setWrap(true);
+        Button createBtn = new Button("Ajouter un patient", _ -> openCreateDialog());
+        createBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+        createBtn.addClassName("primary-action");
+
+        var titleLine = new HorizontalLayout(new ViewTitle("Gestion des patients"));
+        titleLine.setWidthFull();
+
+        var searchLine = new HorizontalLayout(searchField, createBtn);
         searchLine.setWidthFull();
-        toolbar.add(gestionPatient, searchLine);
+        searchLine.setWrap(true);
+        searchLine.setFlexGrow(1, searchField);
+
+        var toolbar = new VerticalLayout(titleLine, searchLine);
+        toolbar.addClassName("page-toolbar");
+        toolbar.setWidthFull();
 
         var dateFormatter = DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(getLocale());
 
@@ -94,102 +72,109 @@ public class PatientListView extends VerticalLayout {
                 .setSortable(true);
 
         patientGrid.addComponentColumn(patient -> {
+            Button modifierBtn = new Button("Modifier");
+            modifierBtn.addClickListener(_ -> openEditDialog(patient));
+
             Button deleteBtn = new Button("Supprimer");
             deleteBtn.addThemeVariants(ButtonVariant.LUMO_ERROR);
 
             deleteBtn.addClickListener(_ -> {
-                Dialog confirmDialog = new Dialog();
-                confirmDialog.setHeaderTitle("Confirmation de suppression");
+                ConfirmDeleteDialog dialog = new ConfirmDeleteDialog(
+                        "Voulez-vous vraiment supprimer le patient : "
+                                + patient.getNomPatient() + " " + patient.getPrenomPatient() + " ?",
+                        () -> {
+                            patientService.deletePatient(patient);
+                            refreshGrid();
 
-                VerticalLayout dialogLayout = new VerticalLayout();
-                dialogLayout.add("Voulez-vous vraiment supprimer le patient : "
-                        + patient.getNomPatient() + " " + patient.getPrenomPatient() + " ?");
+                            Notification.show("Patient supprimé", 3000, Notification.Position.BOTTOM_END)
+                                    .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+                        }
+                );
 
-                Button confirmBtn = new Button("Oui, supprimer", event -> {
-                    patientService.deletePatient(patient);
-                    refreshGrid();
-                    confirmDialog.close();
-
-                    Notification.show("Patient supprimé", 3000, Notification.Position.BOTTOM_END)
-                            .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
-                });
-                confirmBtn.addThemeVariants(ButtonVariant.LUMO_ERROR);
-
-                Button closeBtn = new Button("Annuler", event -> confirmDialog.close());
-
-                HorizontalLayout actions = new HorizontalLayout(confirmBtn, closeBtn);
-
-                dialogLayout.add(actions);
-                confirmDialog.add(dialogLayout);
-                confirmDialog.open();
+                dialog.open();
             });
 
-            return deleteBtn;
+            return new HorizontalLayout(modifierBtn, deleteBtn);
         }).setHeader("Actions");
-
-        patientGrid.asSingleSelect().addValueChangeListener(event -> {
-            selectedPatient = event.getValue();
-
-            if (selectedPatient != null) {
-                cnPatient.setValue(selectedPatient.getCnPatient());
-                nomPatient.setValue(selectedPatient.getNomPatient());
-                prenomPatient.setValue(selectedPatient.getPrenomPatient());
-                dateNaissance.setValue(selectedPatient.getDateNaissance());
-                createBtn.setText("Modifier");
-                cancelBtn.setVisible(true);
-            }
-        });
 
         patientGrid.setEmptyStateText("Aucun patient enregistré");
         patientGrid.setSizeFull();
+        patientGrid.addClassName("professional-grid");
 
         setSizeFull();
+        addClassName("page-container");
         add(toolbar, patientGrid);
     }
 
-    private void saveOrUpdatePatient() {
-        try {
-            if (selectedPatient == null) {
-                patientService.createPatient(
-                        cnPatient.getValue(),
-                        nomPatient.getValue(),
-                        prenomPatient.getValue(),
-                        dateNaissance.getValue()
-                );
+    private void openCreateDialog() {
+        Dialog dialog = new Dialog();
+        dialog.setHeaderTitle("Ajouter un patient");
+        dialog.setWidth("900px");
+        dialog.setMaxWidth("95vw");
 
-                Notification.show("Patient ajouté", 3000, Notification.Position.BOTTOM_END)
-                        .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
-            } else {
-                patientService.updatePatient(
-                        selectedPatient,
-                        cnPatient.getValue(),
-                        nomPatient.getValue(),
-                        prenomPatient.getValue(),
-                        dateNaissance.getValue()
-                );
+        PatientForm form = new PatientForm(
+                null,
+                "Ajouter le patient",
+                data -> {
+                    try {
+                        patientService.createPatient(
+                                data.cnPatient(),
+                                data.nomPatient(),
+                                data.prenomPatient(),
+                                data.dateNaissance()
+                        );
 
-                Notification.show("Patient modifié", 3000, Notification.Position.BOTTOM_END)
-                        .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
-            }
+                        Notification.show("Patient ajouté", 3000, Notification.Position.BOTTOM_END)
+                                .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
 
-            refreshGrid();
-            clearForm();
+                        refreshGrid();
+                        dialog.close();
 
-        } catch (IllegalArgumentException e) {
-            Notification.show(e.getMessage(), 4000, Notification.Position.BOTTOM_END)
-                    .addThemeVariants(NotificationVariant.LUMO_ERROR);
-        }
+                    } catch (IllegalArgumentException e) {
+                        Notification.show(e.getMessage(), 4000, Notification.Position.BOTTOM_END)
+                                .addThemeVariants(NotificationVariant.LUMO_ERROR);
+                    }
+                }
+        );
+
+        dialog.add(form);
+        dialog.open();
     }
 
-    private void clearForm() {
-        cnPatient.clear();
-        nomPatient.clear();
-        prenomPatient.clear();
-        dateNaissance.clear();
-        selectedPatient = null;
-        createBtn.setText("Ajouter");
-        cancelBtn.setVisible(false);
-        patientGrid.asSingleSelect().clear();
+    private void openEditDialog(Patient patient) {
+        Dialog dialog = new Dialog();
+        dialog.setHeaderTitle("Modifier le patient");
+        dialog.setWidth("900px");
+        dialog.setMaxWidth("95vw");
+
+        PatientForm form = new PatientForm(
+                patient,
+                "Modifier le patient",
+                data -> {
+                    try {
+                        patientService.updatePatient(
+                                patient,
+                                data.cnPatient(),
+                                data.nomPatient(),
+                                data.prenomPatient(),
+                                data.dateNaissance()
+                        );
+
+                        Notification.show("Patient modifié", 3000, Notification.Position.BOTTOM_END)
+                                .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+
+                        refreshGrid();
+                        dialog.close();
+
+                    } catch (IllegalArgumentException e) {
+                        Notification.show(e.getMessage(), 4000, Notification.Position.BOTTOM_END)
+                                .addThemeVariants(NotificationVariant.LUMO_ERROR);
+                    }
+                }
+        );
+
+        dialog.add(form);
+        dialog.open();
     }
 
     private void refreshGrid() {

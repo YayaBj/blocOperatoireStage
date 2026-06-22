@@ -3,6 +3,7 @@ package com.example.service;
 import com.example.entity.BoiteChirurgicale;
 import com.example.entity.BoiteMateriel;
 import com.example.entity.UniteMateriel;
+import com.example.entity.enums.EtatMateriel;
 import com.example.entity.enums.PrioriteIntervention;
 import com.example.entity.enums.StatutBoite;
 import com.example.repository.BoiteChirurgicaleRepository;
@@ -49,6 +50,8 @@ public class BoiteChirurgicaleService {
         verifierDoublonsUnites(uniteMaterielIds);
 
         List<UniteMateriel> unites = findUnites(uniteMaterielIds);
+
+        verifierUnitesSteriles(unites);
 
         for (UniteMateriel unite : unites) {
 
@@ -157,6 +160,8 @@ public class BoiteChirurgicaleService {
         verifierDoublonsUnites(uniteMaterielIds);
 
         List<UniteMateriel> unites = findUnites(uniteMaterielIds);
+
+        verifierUnitesSteriles(unites);
         
         for (UniteMateriel unite : unites) {
             boolean dejaDansAutreBoite =
@@ -207,5 +212,17 @@ public class BoiteChirurgicaleService {
                 .orElseThrow(() -> new IllegalArgumentException("Boîte introuvable"));
 
         boiteChirurgicaleRepository.delete(boiteDb);
+    }
+
+    private void verifierUnitesSteriles(List<UniteMateriel> unites) {
+        for (UniteMateriel unite : unites) {
+            if (unite.getEtat() != EtatMateriel.STERILE) {
+                throw new IllegalArgumentException(
+                        "L'unité " + unite.getCodeInventaire()
+                                + " ne peut pas être ajoutée à une boîte car elle est "
+                                + unite.getEtat()
+                );
+            }
+        }
     }
 }

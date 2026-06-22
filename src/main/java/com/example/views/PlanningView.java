@@ -1,22 +1,20 @@
 package com.example.views;
 
+import com.example.base.ui.ViewTitle;
 import com.example.entity.*;
-import com.example.entity.enums.PrioriteIntervention;
 import com.example.entity.enums.StatutIntervention;
 import com.example.service.*;
-import com.example.views.components.RolePersonnelDialog;
+import com.example.views.components.InterventionForm;
 import com.vaadin.flow.component.button.Button;
-import com.vaadin.flow.component.combobox.ComboBox;
-import com.vaadin.flow.component.combobox.MultiSelectComboBox;
+import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.datepicker.DatePicker;
 import com.vaadin.flow.component.dialog.Dialog;
+import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
-import com.vaadin.flow.component.textfield.IntegerField;
-import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.router.Menu;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
@@ -78,7 +76,7 @@ public class PlanningView extends VerticalLayout {
         DatePicker datePicker = new DatePicker("Choisir une date");
         datePicker.setValue(LocalDate.now());
 
-        HorizontalLayout toolbar = getHorizontalLayout(calendar, datePicker);
+        VerticalLayout toolbar = createPlanningToolbar(calendar, datePicker);
 
         loadInterventions(calendar);
 
@@ -87,9 +85,15 @@ public class PlanningView extends VerticalLayout {
             calendar.gotoDate(LocalDate.now());
         });
 
+        calendar.addClassName("planning-calendar");
+
+        Div calendarCard = new Div(calendar);
+        calendarCard.addClassName("planning-calendar-card");
+
         setSizeFull();
-        add(toolbar, calendar);
-        expand(calendar);
+        addClassName("page-container");
+        add(toolbar, calendarCard);
+        expand(calendarCard);
     }
 
     private void getListenerDragAndDrop(InterventionService interventionService, FullCalendar calendar) {
@@ -166,8 +170,7 @@ public class PlanningView extends VerticalLayout {
         });
     }
 
-    @NotNull
-    private static HorizontalLayout getHorizontalLayout(FullCalendar calendar, DatePicker datePicker) {
+    private VerticalLayout createPlanningToolbar(FullCalendar calendar, DatePicker datePicker) {
         Button moisBtn = new Button("Mois", _ -> {
             calendar.changeView(CalendarViewImpl.DAY_GRID_MONTH);
             calendar.gotoDate(datePicker.getValue());
@@ -183,8 +186,22 @@ public class PlanningView extends VerticalLayout {
             calendar.gotoDate(datePicker.getValue());
         });
 
-        HorizontalLayout toolbar = new HorizontalLayout(datePicker, moisBtn, semaineBtn, jourBtn);
+        moisBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
+        semaineBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+        jourBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
+
+        HorizontalLayout titleLine = new HorizontalLayout(new ViewTitle("Planning opératoire"));
+        titleLine.setWidthFull();
+
+        HorizontalLayout actionsLine = new HorizontalLayout(datePicker, moisBtn, semaineBtn, jourBtn);
+        actionsLine.setWidthFull();
+        actionsLine.setWrap(true);
+        actionsLine.setAlignItems(Alignment.END);
+
+        VerticalLayout toolbar = new VerticalLayout(titleLine, actionsLine);
+        toolbar.addClassName("page-toolbar");
         toolbar.setWidthFull();
+
         return toolbar;
     }
 
@@ -221,122 +238,30 @@ public class PlanningView extends VerticalLayout {
         Dialog dialog = new Dialog();
         dialog.setHeaderTitle("Créer une intervention");
 
-        TextField typeIntervention = new TextField("Type intervention");
-
-        ComboBox<PrioriteIntervention> priorite = new ComboBox<>("Priorité");
-        priorite.setItems(PrioriteIntervention.values());
-
-        IntegerField dureePrevue = new IntegerField("Durée prévue (minutes)");
-        dureePrevue.setValue((int) Duration.between(start, end).toMinutes());
-        dureePrevue.setMin(1);
-
-        ComboBox<Patient> patient = new ComboBox<>("Patient");
-        patient.setItems(patientService.findAll());
-        patient.setItemLabelGenerator(p ->
-                p.getCnPatient() + " - " + p.getNomPatient() + " " + p.getPrenomPatient()
-        );
-
-        ComboBox<Salle> salle = new ComboBox<>("Salle");
-        salle.setItems(salleService.findAll());
-        salle.setItemLabelGenerator(s ->
-                s.getNumeroSalle() + " - " + s.getTypeSalle()
-        );
-
-        MultiSelectComboBox<Personnel> personnels = new MultiSelectComboBox<>("Personnel");
-        personnels.setItems(personnelService.findAll());
-        personnels.setItemLabelGenerator(p ->
-                p.getMatricule() + " - " + p.getNomPersonnel() + " " + p.getPrenomPersonnel()
-        );
-
-        MultiSelectComboBox<BoiteChirurgicale> boites = new MultiSelectComboBox<>("Boîtes chirurgicales");
-        boites.setItems(interventionService.findBoitesDisponibles());
-        boites.setItemLabelGenerator(b ->
-                b.getCodeBoite() + " - " + b.getNom()
-        );
-
-        Button createBtn = new Button("Créer", event -> {
-            if (typeIntervention.getValue().trim().isBlank()
-                    || priorite.getValue() == null
-                    || dureePrevue.getValue() == null
-                    || dureePrevue.getValue() <= 0
-                    || patient.getValue() == null
-                    || salle.getValue() == null
-                    || personnels.getValue().isEmpty()
-                    || boites.getValue().isEmpty()) {
-
-                Notification.show("Veuillez remplir tous les champs", 3000, Notification.Position.BOTTOM_END)
-                        .addThemeVariants(NotificationVariant.LUMO_ERROR);
-                return;
-            }
-
-            openRoleDialog(
-                    dialog,
-                    calendar,
-                    typeIntervention.getValue().trim(),
-                    priorite.getValue(),
-                    start,
-                    dureePrevue.getValue(),
-                    patient.getValue(),
-                    salle.getValue(),
-                    personnels,
-                    boites
-            );
-        });
-
-        Button cancelBtn = new Button("Annuler", _ -> dialog.close());
-
-        HorizontalLayout actions = new HorizontalLayout(createBtn, cancelBtn);
-
-        VerticalLayout layout = new VerticalLayout(
-                typeIntervention,
-                priorite,
-                dureePrevue,
-                patient,
-                salle,
-                personnels,
-                boites,
-                actions
-        );
-
-        layout.setWidth("600px");
-
-        dialog.add(layout);
-        dialog.open();
-    }
-
-    private void openRoleDialog(
-            Dialog parentDialog,
-            FullCalendar calendar,
-            String typeIntervention,
-            PrioriteIntervention priorite,
-            LocalDateTime dateHeureDebut,
-            int dureePrevue,
-            Patient patient,
-            Salle salle,
-            MultiSelectComboBox<Personnel> personnels,
-            MultiSelectComboBox<BoiteChirurgicale> boites
-    ) {
-        RolePersonnelDialog roleDialog = new RolePersonnelDialog(
-                personnels.getValue(),
-                personnelsAvecRoles -> {
+        InterventionForm form = new InterventionForm(
+                patientService.findAll(),
+                salleService.findAll(),
+                personnelService.findAll(),
+                interventionService.findBoitesDisponibles(),
+                start,
+                (int) Duration.between(start, end).toMinutes(),
+                (data, personnelsAvecRoles) -> {
                     try {
                         interventionService.createIntervention(
-                                typeIntervention,
-                                priorite,
-                                dateHeureDebut,
-                                dureePrevue,
-                                patient.getId(),
-                                salle.getId(),
+                                data.typeIntervention(),
+                                data.priorite(),
+                                data.dateHeureDebut(),
+                                data.dureePrevue() == null ? 0 : data.dureePrevue(),
+                                data.patientId(),
+                                data.salleId(),
                                 personnelsAvecRoles,
-                                boites.getValue().stream()
-                                        .map(BoiteChirurgicale::getId)
-                                        .toList()
+                                data.boiteIds()
                         );
 
                         Notification.show("Intervention créée", 3000, Notification.Position.BOTTOM_END)
                                 .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
 
-                        parentDialog.close();
+                        dialog.close();
                         loadInterventions(calendar);
 
                     } catch (IllegalArgumentException e) {
@@ -346,41 +271,74 @@ public class PlanningView extends VerticalLayout {
                 }
         );
 
-        roleDialog.open();
+        dialog.setWidth("900px");
+        dialog.setMaxWidth("95vw");
+        form.setWidthFull();
+
+        dialog.add(form);
+        dialog.open();
     }
 
     private void openInterventionDetailsDialog(FullCalendar calendar, Long interventionId) {
-
         Intervention intervention = interventionService.findById(interventionId);
 
         Dialog dialog = new Dialog();
-        dialog.setHeaderTitle("Détails intervention");
+        dialog.setHeaderTitle("Détails de l’intervention");
+        dialog.setWidth("700px");
+        dialog.setMaxWidth("95vw");
 
-        VerticalLayout layout = new VerticalLayout();
+        Span statutBadge = new Span(intervention.getStatutIntervention().name());
 
-        layout.add(
-                new Span("Type : " + intervention.getTypeIntervention()),
-                new Span(
-                        "Patient : " +
-                                intervention.getPatient().getNomPatient() + " " +
-                                intervention.getPatient().getPrenomPatient()
-                ),
-                new Span("Salle : " + intervention.getSalle().getNumeroSalle()),
-                new Span("Début : " + intervention.getDateHeureDebut()),
-                new Span("Durée : " + intervention.getDureePrevue() + " minutes"),
-                new Span("Priorité : " + intervention.getPriorite()),
-                new Span("Statut : " + intervention.getStatutIntervention())
+        switch (intervention.getStatutIntervention()) {
+            case PLANIFIEE -> statutBadge.addClassName("status-neutral");
+            case EN_COURS -> statutBadge.addClassName("status-info");
+            case TERMINEE -> statutBadge.addClassName("status-success");
+            case ANNULEE -> statutBadge.addClassName("status-danger");
+        }
+
+        Div detailsSection = new Div();
+        detailsSection.addClassName("form-section");
+
+        Span title = new Span("Informations de l’intervention");
+        title.addClassName("form-section-title");
+
+        detailsSection.add(
+                title,
+                createDetailLine("Type", intervention.getTypeIntervention()),
+                createDetailLine("Patient", intervention.getPatient().getNomPatient() + " " + intervention.getPatient().getPrenomPatient()),
+                createDetailLine("Salle", intervention.getSalle().getNumeroSalle()),
+                createDetailLine("Début", String.valueOf(intervention.getDateHeureDebut())),
+                createDetailLine("Durée", intervention.getDureePrevue() + " minutes"),
+                createDetailLine("Priorité", String.valueOf(intervention.getPriorite())),
+                statutBadge
         );
 
-        HorizontalLayout actions = getHorizontalLayout(calendar, intervention, dialog);
+        HorizontalLayout actions = createActionButtons(calendar, intervention, dialog);
 
-        layout.add(actions);
+        VerticalLayout layout = new VerticalLayout(detailsSection, actions);
+        layout.setWidthFull();
+
         dialog.add(layout);
         dialog.open();
     }
 
+    private HorizontalLayout createDetailLine(String label, String value) {
+        Span labelSpan = new Span(label + " :");
+        labelSpan.getStyle()
+                .set("font-weight", "600")
+                .set("color", "#334155");
+
+        Span valueSpan = new Span(value == null ? "" : value);
+
+        HorizontalLayout line = new HorizontalLayout(labelSpan, valueSpan);
+        line.setWidthFull();
+        line.setSpacing(true);
+
+        return line;
+    }
+
     @NotNull
-    private HorizontalLayout getHorizontalLayout(FullCalendar calendar, Intervention intervention, Dialog dialog) {
+    private HorizontalLayout createActionButtons(FullCalendar calendar, Intervention intervention, Dialog dialog) {
         Button annulerBtn = new Button("Annuler");
 
         annulerBtn.addClickListener(event -> {
@@ -442,7 +400,7 @@ public class PlanningView extends VerticalLayout {
 
         HorizontalLayout actions = new HorizontalLayout();
 
-        Button demarrerBtn = getButton(calendar, intervention, dialog);
+        Button demarrerBtn = createDemarrerButton(calendar, intervention, dialog);
 
         if (intervention.getStatutIntervention() == StatutIntervention.PLANIFIEE) {
             actions.add(demarrerBtn);
@@ -452,7 +410,8 @@ public class PlanningView extends VerticalLayout {
             actions.add(terminerBtn);
         }
 
-        if (intervention.getStatutIntervention() != StatutIntervention.ANNULEE || intervention.getStatutIntervention() != StatutIntervention.TERMINEE) {
+        if (intervention.getStatutIntervention() != StatutIntervention.ANNULEE
+                && intervention.getStatutIntervention() != StatutIntervention.TERMINEE) {
             actions.add(annulerBtn);
         }
 
@@ -462,7 +421,7 @@ public class PlanningView extends VerticalLayout {
     }
 
     @NotNull
-    private Button getButton(FullCalendar calendar, Intervention intervention, Dialog dialog) {
+    private Button createDemarrerButton(FullCalendar calendar, Intervention intervention, Dialog dialog) {
         Button demarrerBtn = new Button("Démarrer intervention");
 
         demarrerBtn.addClickListener(event -> {

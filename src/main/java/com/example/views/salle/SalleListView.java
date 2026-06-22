@@ -2,13 +2,14 @@ package com.example.views.salle;
 
 import com.example.base.ui.ViewTitle;
 import com.example.entity.Salle;
-import com.example.entity.enums.StatutSalle;
 import com.example.service.SalleService;
+import com.example.views.components.ConfirmDeleteDialog;
+import com.example.views.components.SalleForm;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
-import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.grid.Grid;
+import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
@@ -20,58 +21,38 @@ import com.vaadin.flow.router.Route;
 
 @Route(value = "salles")
 @PageTitle("Gestion des salles")
-@Menu(order = 3, icon = "icons/building.svg", title = "Salles")
+@Menu(order = 4, icon = "icons/building.svg", title = "Données de base/Salles")
 public class SalleListView extends VerticalLayout {
 
     private final SalleService salleService;
 
-    final TextField numeroSalle;
-    final TextField typeSalle;
-    final ComboBox<StatutSalle> statutSalle;
     final TextField searchField;
-    final Button createBtn;
-    final Button cancelBtn;
     final Grid<Salle> salleGrid;
-
-    private Salle selectedSalle = null;
 
     public SalleListView(SalleService salleService) {
         this.salleService = salleService;
 
-        numeroSalle = new TextField();
-        numeroSalle.setPlaceholder("Numéro salle");
-
-        typeSalle = new TextField();
-        typeSalle.setPlaceholder("Type salle");
-
-        statutSalle = new ComboBox<>();
-        statutSalle.setPlaceholder("Statut salle");
-        statutSalle.setItems(StatutSalle.values());
-
-        createBtn = new Button("Ajouter", _ -> saveOrUpdateSalle());
-        createBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
-
-        cancelBtn = new Button("Annuler", _ -> clearForm());
-        cancelBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
-        cancelBtn.setVisible(false);
-
         searchField = new TextField();
         searchField.setPlaceholder("Rechercher par numéro, type ou statut");
         searchField.setClearButtonVisible(true);
-        searchField.setWidth("18em");
+        searchField.setWidth("30em");
+        searchField.addValueChangeListener(_ -> refreshGrid());
 
-        var toolbar = new VerticalLayout();
-        var gestionSalle = new HorizontalLayout();
-        gestionSalle.add(new ViewTitle("Gestion des salles"), numeroSalle, typeSalle, statutSalle, createBtn, cancelBtn);
-        gestionSalle.setFlexGrow(1, numeroSalle, typeSalle, statutSalle);
-        gestionSalle.setWrap(true);
-        gestionSalle.setWidthFull();
-        var searchLine = new HorizontalLayout();
-        searchLine.add(searchField);
-        searchLine.setFlexGrow(1, searchField);
-        searchLine.setWrap(true);
+        Button createBtn = new Button("Ajouter une salle", _ -> openCreateDialog());
+        createBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+        createBtn.addClassName("primary-action");
+
+        var titleLine = new HorizontalLayout(new ViewTitle("Gestion des salles"));
+        titleLine.setWidthFull();
+
+        var searchLine = new HorizontalLayout(searchField, createBtn);
         searchLine.setWidthFull();
-        toolbar.add(gestionSalle, searchLine);
+        searchLine.setWrap(true);
+        searchLine.setFlexGrow(1, searchField);
+
+        var toolbar = new VerticalLayout(titleLine, searchLine);
+        toolbar.addClassName("page-toolbar");
+        toolbar.setWidthFull();
 
         salleGrid = new Grid<>();
         refreshGrid();
@@ -79,99 +60,123 @@ public class SalleListView extends VerticalLayout {
 
         salleGrid.addColumn(Salle::getNumeroSalle).setHeader("Numéro").setSortable(true);
         salleGrid.addColumn(Salle::getTypeSalle).setHeader("Type").setSortable(true);
-        salleGrid.addColumn(Salle::getStatutSalle).setHeader("Statut").setSortable(true);
+        salleGrid.addComponentColumn(salle -> {
+            Span badge = new Span(salle.getStatutSalle() == null ? "" : salle.getStatutSalle().name());
+
+            if (salle.getStatutSalle() == null) {
+                badge.addClassName("status-neutral");
+            } else {
+                switch (salle.getStatutSalle()) {
+                    case DISPONIBLE -> badge.addClassName("status-success");
+                    case EN_NETTOYAGE -> badge.addClassName("status-info");
+                    case MAINTENANCE -> badge.addClassName("status-neutral");
+                }
+            }
+
+            return badge;
+        }).setHeader("Statut");
 
         salleGrid.addComponentColumn(salle -> {
+            Button modifierBtn = new Button("Modifier");
+            modifierBtn.addClickListener(_ -> openEditDialog(salle));
+
             Button deleteBtn = new Button("Supprimer");
             deleteBtn.addThemeVariants(ButtonVariant.LUMO_ERROR);
 
             deleteBtn.addClickListener(_ -> {
-                Dialog confirmDialog = new Dialog();
-                confirmDialog.setHeaderTitle("Confirmation de suppression");
+                ConfirmDeleteDialog dialog = new ConfirmDeleteDialog(
+                        "Voulez-vous vraiment supprimer la salle : " + salle.getNumeroSalle() + " ?",
+                        () -> {
+                            salleService.deleteSalle(salle);
+                            refreshGrid();
 
-                VerticalLayout dialogLayout = new VerticalLayout();
-                dialogLayout.add("Voulez-vous vraiment supprimer la salle : " + salle.getNumeroSalle() + " ?");
+                            Notification.show("Salle supprimée", 3000, Notification.Position.BOTTOM_END)
+                                    .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+                        }
+                );
 
-                Button confirmBtn = new Button("Oui, supprimer", event -> {
-                    salleService.deleteSalle(salle);
-                    refreshGrid();
-                    confirmDialog.close();
-
-                    Notification.show("Salle supprimée", 3000, Notification.Position.BOTTOM_END)
-                            .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
-                });
-                confirmBtn.addThemeVariants(ButtonVariant.LUMO_ERROR);
-
-                Button closeBtn = new Button("Annuler", event -> confirmDialog.close());
-
-                HorizontalLayout actions = new HorizontalLayout(confirmBtn, closeBtn);
-                dialogLayout.add(actions);
-                confirmDialog.add(dialogLayout);
-                confirmDialog.open();
+                dialog.open();
             });
 
-            return deleteBtn;
+            return new HorizontalLayout(modifierBtn, deleteBtn);
         }).setHeader("Actions");
-
-        salleGrid.asSingleSelect().addValueChangeListener(event -> {
-            selectedSalle = event.getValue();
-
-            if (selectedSalle != null) {
-                numeroSalle.setValue(selectedSalle.getNumeroSalle());
-                typeSalle.setValue(selectedSalle.getTypeSalle());
-                statutSalle.setValue(selectedSalle.getStatutSalle());
-                createBtn.setText("Modifier");
-                cancelBtn.setVisible(true);
-            }
-        });
 
         salleGrid.setEmptyStateText("Aucune salle enregistrée");
         salleGrid.setSizeFull();
+        salleGrid.addClassName("professional-grid");
 
         setSizeFull();
+        addClassName("page-container");
         add(toolbar, salleGrid);
     }
 
-    private void saveOrUpdateSalle() {
-        try {
-            if (selectedSalle == null) {
-                salleService.createSalle(
-                        numeroSalle.getValue(),
-                        typeSalle.getValue(),
-                        statutSalle.getValue()
-                );
+    private void openCreateDialog() {
+        Dialog dialog = new Dialog();
+        dialog.setHeaderTitle("Ajouter une salle");
+        dialog.setWidth("900px");
+        dialog.setMaxWidth("95vw");
 
-                Notification.show("Salle ajoutée", 3000, Notification.Position.BOTTOM_END)
-                        .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
-            } else {
-                salleService.updateSalle(
-                        selectedSalle,
-                        numeroSalle.getValue(),
-                        typeSalle.getValue(),
-                        statutSalle.getValue()
-                );
+        SalleForm form = new SalleForm(
+                null,
+                "Ajouter la salle",
+                data -> {
+                    try {
+                        salleService.createSalle(
+                                data.numeroSalle(),
+                                data.typeSalle(),
+                                data.statutSalle()
+                        );
 
-                Notification.show("Salle modifiée", 3000, Notification.Position.BOTTOM_END)
-                        .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
-            }
+                        Notification.show("Salle ajoutée", 3000, Notification.Position.BOTTOM_END)
+                                .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
 
-            refreshGrid();
-            clearForm();
+                        refreshGrid();
+                        dialog.close();
 
-        } catch (IllegalArgumentException e) {
-            Notification.show(e.getMessage(), 4000, Notification.Position.BOTTOM_END)
-                    .addThemeVariants(NotificationVariant.LUMO_ERROR);
-        }
+                    } catch (IllegalArgumentException e) {
+                        Notification.show(e.getMessage(), 4000, Notification.Position.BOTTOM_END)
+                                .addThemeVariants(NotificationVariant.LUMO_ERROR);
+                    }
+                }
+        );
+
+        dialog.add(form);
+        dialog.open();
     }
 
-    private void clearForm() {
-        numeroSalle.clear();
-        typeSalle.clear();
-        statutSalle.clear();
-        selectedSalle = null;
-        createBtn.setText("Ajouter");
-        cancelBtn.setVisible(false);
-        salleGrid.asSingleSelect().clear();
+    private void openEditDialog(Salle salle) {
+        Dialog dialog = new Dialog();
+        dialog.setHeaderTitle("Modifier la salle");
+        dialog.setWidth("900px");
+        dialog.setMaxWidth("95vw");
+
+        SalleForm form = new SalleForm(
+                salle,
+                "Modifier la salle",
+                data -> {
+                    try {
+                        salleService.updateSalle(
+                                salle,
+                                data.numeroSalle(),
+                                data.typeSalle(),
+                                data.statutSalle()
+                        );
+
+                        Notification.show("Salle modifiée", 3000, Notification.Position.BOTTOM_END)
+                                .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+
+                        refreshGrid();
+                        dialog.close();
+
+                    } catch (IllegalArgumentException e) {
+                        Notification.show(e.getMessage(), 4000, Notification.Position.BOTTOM_END)
+                                .addThemeVariants(NotificationVariant.LUMO_ERROR);
+                    }
+                }
+        );
+
+        dialog.add(form);
+        dialog.open();
     }
 
     private void refreshGrid() {

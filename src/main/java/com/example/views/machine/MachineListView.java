@@ -1,12 +1,11 @@
 package com.example.views.machine;
 
+import com.example.base.ui.ViewTitle;
 import com.example.entity.Machine;
-import com.example.entity.enums.StatutMachine;
-import com.example.entity.enums.TypeMachine;
 import com.example.service.MachineService;
+import com.example.views.components.MachineForm;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
-import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.html.Span;
@@ -14,7 +13,6 @@ import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
-import com.vaadin.flow.component.textfield.IntegerField;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.router.Menu;
 import com.vaadin.flow.router.PageTitle;
@@ -22,7 +20,7 @@ import com.vaadin.flow.router.Route;
 
 @Route("machines")
 @PageTitle("Gestion des Machines")
-@Menu(order = 10, icon = "icons/settings.svg", title = "Machines")
+@Menu(order = 9, icon = "icons/settings.svg", title = "Stérilisation/Machines")
 public class MachineListView extends VerticalLayout {
 
     private final MachineService machineService;
@@ -41,10 +39,19 @@ public class MachineListView extends VerticalLayout {
 
         Button createBtn = new Button("Ajouter une machine", event -> openCreateDialog());
         createBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+        createBtn.addClassName("primary-action");
 
-        HorizontalLayout toolbar = new HorizontalLayout(searchField, createBtn);
+        var titleLine = new HorizontalLayout(new ViewTitle("Gestion des machines"));
+        titleLine.setWidthFull();
+
+        var searchLine = new HorizontalLayout(searchField, createBtn);
+        searchLine.setWidthFull();
+        searchLine.setWrap(true);
+        searchLine.setFlexGrow(1, searchField);
+
+        var toolbar = new VerticalLayout(titleLine, searchLine);
+        toolbar.addClassName("page-toolbar");
         toolbar.setWidthFull();
-        toolbar.setWrap(true);
 
         machineGrid = new Grid<>();
 
@@ -60,9 +67,22 @@ public class MachineListView extends VerticalLayout {
                 .setHeader("Cycle en cours")
                 .setSortable(true);
 
-        machineGrid.addColumn(Machine::getStatut)
-                .setHeader("Statut")
-                .setSortable(true);
+        machineGrid.addComponentColumn(machine -> {
+            Span badge = new Span(machine.getStatut() == null ? "" : machine.getStatut().name());
+
+            if (machine.getStatut() == null) {
+                badge.addClassName("status-neutral");
+            } else {
+                switch (machine.getStatut()) {
+                    case IDLE -> badge.addClassName("status-success");
+                    case ACTIVE -> badge.addClassName("status-info");
+                    case MAINTENANCE -> badge.addClassName("status-neutral");
+                    case ERROR -> badge.addClassName("status-danger");
+                }
+            }
+
+            return badge;
+        }).setHeader("Statut");
 
         machineGrid.addColumn(machine -> machine.getTempsProcessusMinutes() + " min")
                 .setHeader("Temps de processus")
@@ -84,8 +104,13 @@ public class MachineListView extends VerticalLayout {
 
         machineGrid.setEmptyStateText("Aucune machine enregistrée");
         machineGrid.setSizeFull();
+        machineGrid.addClassName("professional-grid");
+
+        toolbar.addClassName("page-toolbar");
+        createBtn.addClassName("primary-action");
 
         setSizeFull();
+        addClassName("page-container");
         getStyle().set("overflow", "auto");
 
         add(toolbar, machineGrid);
@@ -103,80 +128,50 @@ public class MachineListView extends VerticalLayout {
     private void openMachineDialog(Machine selectedMachine) {
         Dialog dialog = new Dialog();
         dialog.setHeaderTitle(selectedMachine == null ? "Ajouter une machine" : "Modifier une machine");
+        dialog.setWidth("900px");
+        dialog.setMaxWidth("95vw");
 
-        TextField nom = new TextField("Nom");
+        MachineForm form = new MachineForm(
+                selectedMachine,
+                selectedMachine == null ? "Ajouter la machine" : "Modifier la machine",
+                data -> {
+                    try {
+                        if (selectedMachine == null) {
+                            machineService.createMachine(
+                                    data.nom(),
+                                    data.typeMachine(),
+                                    data.tempsProcessusMinutes() == null ? 0 : data.tempsProcessusMinutes(),
+                                    data.cycleEnCours(),
+                                    data.statut()
+                            );
 
-        ComboBox<TypeMachine> typeMachine = new ComboBox<>("Type de machine");
-        typeMachine.setItems(TypeMachine.values());
+                            Notification.show("Machine ajoutée", 3000, Notification.Position.BOTTOM_END)
+                                    .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+                        } else {
+                            machineService.updateMachine(
+                                    selectedMachine,
+                                    data.nom(),
+                                    data.typeMachine(),
+                                    data.tempsProcessusMinutes() == null ? 0 : data.tempsProcessusMinutes(),
+                                    data.cycleEnCours(),
+                                    data.statut()
+                            );
 
-        IntegerField tempsProcessus = new IntegerField("Temps de processus (minutes)");
-        tempsProcessus.setMin(0);
+                            Notification.show("Machine modifiée", 3000, Notification.Position.BOTTOM_END)
+                                    .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+                        }
 
-        TextField cycleEnCours = new TextField("Cycle en cours");
+                        refreshGrid();
+                        dialog.close();
 
-        ComboBox<StatutMachine> statut = new ComboBox<>("Statut");
-        statut.setItems(StatutMachine.values());
-
-        if (selectedMachine != null) {
-            nom.setValue(selectedMachine.getNom() == null ? "" : selectedMachine.getNom());
-            typeMachine.setValue(selectedMachine.getTypeMachine());
-            tempsProcessus.setValue(selectedMachine.getTempsProcessusMinutes());
-            cycleEnCours.setValue(selectedMachine.getCycleEnCours() == null ? "" : selectedMachine.getCycleEnCours());
-            statut.setValue(selectedMachine.getStatut());
-        }
-
-        Button saveBtn = new Button(selectedMachine == null ? "Enregistrer" : "Modifier", event -> {
-            try {
-                if (selectedMachine == null) {
-                    machineService.createMachine(
-                            nom.getValue(),
-                            typeMachine.getValue(),
-                            tempsProcessus.getValue() == null ? 0 : tempsProcessus.getValue(),
-                            cycleEnCours.getValue(),
-                            statut.getValue()
-                    );
-
-                    Notification.show("Machine ajoutée", 3000, Notification.Position.BOTTOM_END)
-                            .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
-                } else {
-                    machineService.updateMachine(
-                            selectedMachine,
-                            nom.getValue(),
-                            typeMachine.getValue(),
-                            tempsProcessus.getValue() == null ? 0 : tempsProcessus.getValue(),
-                            cycleEnCours.getValue(),
-                            statut.getValue()
-                    );
-
-                    Notification.show("Machine modifiée", 3000, Notification.Position.BOTTOM_END)
-                            .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+                    } catch (IllegalArgumentException e) {
+                        Notification.show(e.getMessage(), 4000, Notification.Position.BOTTOM_END)
+                                .addThemeVariants(NotificationVariant.LUMO_ERROR);
+                    }
                 }
-
-                refreshGrid();
-                dialog.close();
-
-            } catch (IllegalArgumentException e) {
-                Notification.show(e.getMessage(), 4000, Notification.Position.BOTTOM_END)
-                        .addThemeVariants(NotificationVariant.LUMO_ERROR);
-            }
-        });
-
-        saveBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
-
-        Button cancelBtn = new Button("Annuler", event -> dialog.close());
-
-        VerticalLayout layout = new VerticalLayout(
-                nom,
-                typeMachine,
-                tempsProcessus,
-                cycleEnCours,
-                statut,
-                new HorizontalLayout(saveBtn, cancelBtn)
         );
 
-        layout.setWidth("550px");
-
-        dialog.add(layout);
+        dialog.add(form);
         dialog.open();
     }
 

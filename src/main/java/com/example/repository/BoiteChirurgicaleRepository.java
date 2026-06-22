@@ -7,7 +7,5 @@ public interface BoiteChirurgicaleRepository extends JpaRepository<BoiteChirurgi
 
     boolean existsByCodeBoiteIgnoreCase(String codeBoite);
 
-    boolean existsByNomIgnoreCase(String nom);
-
     BoiteChirurgicale findByCodeBoiteIgnoreCase(String codeBoite);
 }

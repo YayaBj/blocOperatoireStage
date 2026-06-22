@@ -3,6 +3,8 @@ package com.example.views.personnel;
 import com.example.base.ui.ViewTitle;
 import com.example.entity.Personnel;
 import com.example.service.PersonnelService;
+import com.example.views.components.ConfirmDeleteDialog;
+import com.example.views.components.PersonnelForm;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.dialog.Dialog;
@@ -18,61 +20,38 @@ import com.vaadin.flow.router.Route;
 
 @Route(value = "personnels")
 @PageTitle("Gestion du personnel")
-@Menu(order = 2, icon = "icons/users.svg", title = "Personnel")
+@Menu(order = 3, icon = "icons/users.svg", title = "Données de base/Personnel")
 public class PersonnelListView extends VerticalLayout {
 
     private final PersonnelService personnelService;
 
-    final TextField matricule;
-    final TextField nomPersonnel;
-    final TextField prenomPersonnel;
-    final TextField specialite;
     final TextField searchField;
-    final Button createBtn;
-    final Button cancelBtn;
     final Grid<Personnel> personnelGrid;
-
-    private Personnel selectedPersonnel = null;
 
     public PersonnelListView(PersonnelService personnelService) {
         this.personnelService = personnelService;
 
-        matricule = new TextField();
-        matricule.setPlaceholder("Matricule");
-
-        nomPersonnel = new TextField();
-        nomPersonnel.setPlaceholder("Nom");
-
-        prenomPersonnel = new TextField();
-        prenomPersonnel.setPlaceholder("Prénom");
-
-        specialite = new TextField();
-        specialite.setPlaceholder("Spécialité");
-
-        createBtn = new Button("Ajouter", _ -> saveOrUpdatePersonnel());
-        createBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
-
-        cancelBtn = new Button("Annuler", _ -> clearForm());
-        cancelBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
-        cancelBtn.setVisible(false);
-
         searchField = new TextField();
         searchField.setPlaceholder("Rechercher par matricule, nom, prénom ou spécialité");
         searchField.setClearButtonVisible(true);
-        searchField.setWidth("18em");
+        searchField.setWidth("30em");
+        searchField.addValueChangeListener(_ -> refreshGrid());
 
-        var toolbar = new VerticalLayout();
-        var gestionPersonnel = new HorizontalLayout();
-        gestionPersonnel.add(new ViewTitle("Gestion du personnel"), matricule, nomPersonnel, prenomPersonnel, specialite, createBtn, cancelBtn);
-        gestionPersonnel.setFlexGrow(1, matricule, nomPersonnel, prenomPersonnel, specialite);
-        gestionPersonnel.setWrap(true);
-        gestionPersonnel.setWidthFull();
-        var searchLine = new HorizontalLayout();
-        searchLine.add(searchField);
-        searchLine.setFlexGrow(1, searchField);
-        searchLine.setWrap(true);
+        Button createBtn = new Button("Ajouter un personnel", _ -> openCreateDialog());
+        createBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+        createBtn.addClassName("primary-action");
+
+        var titleLine = new HorizontalLayout(new ViewTitle("Gestion du personnel"));
+        titleLine.setWidthFull();
+
+        var searchLine = new HorizontalLayout(searchField, createBtn);
         searchLine.setWidthFull();
-        toolbar.add(gestionPersonnel, searchLine);
+        searchLine.setWrap(true);
+        searchLine.setFlexGrow(1, searchField);
+
+        var toolbar = new VerticalLayout(titleLine, searchLine);
+        toolbar.addClassName("page-toolbar");
+        toolbar.setWidthFull();
 
         personnelGrid = new Grid<>();
         refreshGrid();
@@ -84,103 +63,111 @@ public class PersonnelListView extends VerticalLayout {
         personnelGrid.addColumn(Personnel::getSpecialite).setHeader("Spécialité").setSortable(true);
 
         personnelGrid.addComponentColumn(personnel -> {
+            Button modifierBtn = new Button("Modifier");
+            modifierBtn.addClickListener(_ -> openEditDialog(personnel));
+
             Button deleteBtn = new Button("Supprimer");
             deleteBtn.addThemeVariants(ButtonVariant.LUMO_ERROR);
 
             deleteBtn.addClickListener(_ -> {
-                Dialog confirmDialog = new Dialog();
-                confirmDialog.setHeaderTitle("Confirmation de suppression");
+                ConfirmDeleteDialog dialog = new ConfirmDeleteDialog(
+                        "Voulez-vous vraiment supprimer : "
+                                + personnel.getNomPersonnel() + " " + personnel.getPrenomPersonnel() + " ?",
+                        () -> {
+                            personnelService.deletePersonnel(personnel);
+                            refreshGrid();
 
-                VerticalLayout dialogLayout = new VerticalLayout();
-                dialogLayout.add("Voulez-vous vraiment supprimer : "
-                        + personnel.getNomPersonnel() + " " + personnel.getPrenomPersonnel() + " ?");
+                            Notification.show("Personnel supprimé", 3000, Notification.Position.BOTTOM_END)
+                                    .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+                        }
+                );
 
-                Button confirmBtn = new Button("Oui, supprimer", event -> {
-                    personnelService.deletePersonnel(personnel);
-                    refreshGrid();
-                    confirmDialog.close();
-
-                    Notification.show("Personnel supprimé", 3000, Notification.Position.BOTTOM_END)
-                            .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
-                });
-                confirmBtn.addThemeVariants(ButtonVariant.LUMO_ERROR);
-
-                Button closeBtn = new Button("Annuler", event -> confirmDialog.close());
-
-                HorizontalLayout actions = new HorizontalLayout(confirmBtn, closeBtn);
-
-                dialogLayout.add(actions);
-                confirmDialog.add(dialogLayout);
-                confirmDialog.open();
+                dialog.open();
             });
 
-            return deleteBtn;
+            return new HorizontalLayout(modifierBtn, deleteBtn);
         }).setHeader("Actions");
-
-        personnelGrid.asSingleSelect().addValueChangeListener(event -> {
-            selectedPersonnel = event.getValue();
-
-            if (selectedPersonnel != null) {
-                matricule.setValue(selectedPersonnel.getMatricule());
-                nomPersonnel.setValue(selectedPersonnel.getNomPersonnel());
-                prenomPersonnel.setValue(selectedPersonnel.getPrenomPersonnel());
-                specialite.setValue(selectedPersonnel.getSpecialite());
-                createBtn.setText("Modifier");
-                cancelBtn.setVisible(true);
-            }
-        });
 
         personnelGrid.setEmptyStateText("Aucun personnel enregistré");
         personnelGrid.setSizeFull();
+        personnelGrid.addClassName("professional-grid");
 
         setSizeFull();
+        addClassName("page-container");
         add(toolbar, personnelGrid);
     }
 
-    private void saveOrUpdatePersonnel() {
-        try {
-            if (selectedPersonnel == null) {
-                personnelService.createPersonnel(
-                        matricule.getValue(),
-                        nomPersonnel.getValue(),
-                        prenomPersonnel.getValue(),
-                        specialite.getValue()
-                );
+    private void openCreateDialog() {
+        Dialog dialog = new Dialog();
+        dialog.setHeaderTitle("Ajouter un personnel");
+        dialog.setWidth("900px");
+        dialog.setMaxWidth("95vw");
 
-                Notification.show("Personnel ajouté", 3000, Notification.Position.BOTTOM_END)
-                        .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
-            } else {
-                personnelService.updatePersonnel(
-                        selectedPersonnel,
-                        matricule.getValue(),
-                        nomPersonnel.getValue(),
-                        prenomPersonnel.getValue(),
-                        specialite.getValue()
-                );
+        PersonnelForm form = new PersonnelForm(
+                null,
+                "Ajouter le personnel",
+                data -> {
+                    try {
+                        personnelService.createPersonnel(
+                                data.matricule(),
+                                data.nomPersonnel(),
+                                data.prenomPersonnel(),
+                                data.specialite()
+                        );
 
-                Notification.show("Personnel modifié", 3000, Notification.Position.BOTTOM_END)
-                        .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
-            }
+                        Notification.show("Personnel ajouté", 3000, Notification.Position.BOTTOM_END)
+                                .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
 
-            refreshGrid();
-            clearForm();
+                        refreshGrid();
+                        dialog.close();
 
-        } catch (IllegalArgumentException e) {
-            Notification.show(e.getMessage(), 4000, Notification.Position.BOTTOM_END)
-                    .addThemeVariants(NotificationVariant.LUMO_ERROR);
-        }
+                    } catch (IllegalArgumentException e) {
+                        Notification.show(e.getMessage(), 4000, Notification.Position.BOTTOM_END)
+                                .addThemeVariants(NotificationVariant.LUMO_ERROR);
+                    }
+                }
+        );
+
+        dialog.add(form);
+        dialog.open();
     }
 
-    private void clearForm() {
-        matricule.clear();
-        nomPersonnel.clear();
-        prenomPersonnel.clear();
-        specialite.clear();
-        selectedPersonnel = null;
-        createBtn.setText("Ajouter");
-        cancelBtn.setVisible(false);
-        personnelGrid.asSingleSelect().clear();
+    private void openEditDialog(Personnel personnel) {
+        Dialog dialog = new Dialog();
+        dialog.setHeaderTitle("Modifier le personnel");
+        dialog.setWidth("900px");
+        dialog.setMaxWidth("95vw");
+
+        PersonnelForm form = new PersonnelForm(
+                personnel,
+                "Modifier le personnel",
+                data -> {
+                    try {
+                        personnelService.updatePersonnel(
+                                personnel,
+                                data.matricule(),
+                                data.nomPersonnel(),
+                                data.prenomPersonnel(),
+                                data.specialite()
+                        );
+
+                        Notification.show("Personnel modifié", 3000, Notification.Position.BOTTOM_END)
+                                .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+
+                        refreshGrid();
+                        dialog.close();
+
+                    } catch (IllegalArgumentException e) {
+                        Notification.show(e.getMessage(), 4000, Notification.Position.BOTTOM_END)
+                                .addThemeVariants(NotificationVariant.LUMO_ERROR);
+                    }
+                }
+        );
+
+        dialog.add(form);
+        dialog.open();
     }
+
 
     private void refreshGrid() {
         String search = searchField.getValue() == null ? "" : searchField.getValue().trim().toLowerCase();
