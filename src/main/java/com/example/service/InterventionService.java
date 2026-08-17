@@ -44,6 +44,23 @@ public class InterventionService {
         this.interventionBoiteRepository = interventionBoiteRepository;
     }
 
+    /**
+     * Crée et planifie une nouvelle intervention chirurgicale.
+     * Vérifie la disponibilité du patient, de la salle, du personnel et des boîtes
+     * avant d'enregistrer l'intervention et les différentes affectations.
+     *
+     * @param typeIntervention type de l'intervention
+     * @param priorite niveau de priorité de l'intervention
+     * @param dateHeureDebut date et heure prévues de début
+     * @param dureePrevue durée prévue de l'intervention en minutes
+     * @param patientId identifiant du patient concerné
+     * @param salleId identifiant de la salle sélectionnée
+     * @param personnelsAvecRoles personnels affectés et leurs rôles respectifs
+     * @param boiteIds identifiants des boîtes chirurgicales sélectionnées
+     * @throws IllegalArgumentException si les données sont invalides,
+     *                                  si une ressource est introuvable
+     *                                  ou si une ressource n'est pas disponible
+     */
     @Transactional
     public void createIntervention(
             String typeIntervention,
@@ -88,6 +105,15 @@ public class InterventionService {
         reserverBoitesPourIntervention(boiteIds, intervention);
     }
 
+    /**
+     * Vérifie la validité des informations obligatoires d'une intervention.
+     *
+     * @param typeIntervention type de l'intervention
+     * @param priorite priorité de l'intervention
+     * @param dateHeureDebut date et heure prévues de début
+     * @param dureePrevue durée prévue en minutes
+     * @throws IllegalArgumentException si une donnée obligatoire est invalide
+     */
     private void verifierDonneesIntervention(String typeIntervention,
                                              PrioriteIntervention priorite,
                                              LocalDateTime dateHeureDebut,
@@ -109,11 +135,25 @@ public class InterventionService {
         }
     }
 
+    /**
+     * Recherche un patient à partir de son identifiant.
+     *
+     * @param patientId identifiant du patient
+     * @return le patient correspondant
+     * @throws IllegalArgumentException si le patient est introuvable
+     */
     private Patient findPatient(Long patientId) {
         return patientRepository.findById(patientId)
                 .orElseThrow(() -> new IllegalArgumentException("Patient introuvable"));
     }
 
+    /**
+     * Recherche une salle et vérifie qu'elle est actuellement disponible.
+     *
+     * @param salleId identifiant de la salle
+     * @return la salle disponible correspondante
+     * @throws IllegalArgumentException si la salle est introuvable ou indisponible
+     */
     private Salle findSalleDisponible(Long salleId) {
         Salle salle = salleRepository.findById(salleId)
                 .orElseThrow(() -> new IllegalArgumentException("Salle introuvable"));
@@ -125,6 +165,20 @@ public class InterventionService {
         return salle;
     }
 
+    /**
+     * Vérifie la disponibilité de l'ensemble des ressources nécessaires
+     * à une intervention sur un créneau donné.
+     *
+     * @param patientId identifiant du patient
+     * @param salleId identifiant de la salle
+     * @param personnelsAvecRoles personnels sélectionnés et leurs rôles
+     * @param boiteIds identifiants des boîtes sélectionnées
+     * @param debut début du créneau
+     * @param fin fin du créneau
+     * @param interventionIgnoreeId intervention à ignorer lors d'une modification,
+     *                              ou null lors d'une création
+     * @throws IllegalArgumentException si une ressource présente un conflit de disponibilité
+     */
     private void verifierDisponibilites(Long patientId,
                                         Long salleId,
                                         Map<Long, RoleIntervention> personnelsAvecRoles,
@@ -139,6 +193,14 @@ public class InterventionService {
         verifierDisponibiliteBoites(boiteIds, debut, fin, interventionIgnoreeId);
     }
 
+    /**
+     * Associe les boîtes chirurgicales sélectionnées à une intervention
+     * et met à jour leur statut.
+     *
+     * @param boiteIds identifiants des boîtes à réserver
+     * @param intervention intervention concernée
+     * @throws IllegalArgumentException si une ou plusieurs boîtes sont introuvables
+     */
     private void reserverBoitesPourIntervention(List<Long> boiteIds, Intervention intervention) {
         List<BoiteChirurgicale> boites = boiteChirurgicaleRepository.findAllById(boiteIds);
 
@@ -156,6 +218,14 @@ public class InterventionService {
         }
     }
 
+    /**
+     * Affecte les membres du personnel sélectionnés à une intervention
+     * en enregistrant le rôle de chacun.
+     *
+     * @param personnelsAvecRoles personnels à affecter et leurs rôles
+     * @param intervention intervention concernée
+     * @throws IllegalArgumentException si un membre du personnel est introuvable
+     */
     private void affecterPersonnel(Map<Long, RoleIntervention> personnelsAvecRoles, Intervention intervention) {
         for (Map.Entry<Long, RoleIntervention> entry : personnelsAvecRoles.entrySet()) {
             Personnel personnel = personnelRepository.findById(entry.getKey())
@@ -171,6 +241,14 @@ public class InterventionService {
         }
     }
 
+    /**
+     * Termine une intervention chirurgicale et déclenche le traitement
+     * des boîtes utilisées afin de lancer leur processus de stérilisation.
+     *
+     * @param interventionId identifiant de l'intervention à terminer
+     * @throws IllegalArgumentException si l'intervention est introuvable,
+     *                                  déjà terminée ou annulée
+     */
     @Transactional
     public void terminerIntervention(Long interventionId) {
         Intervention intervention = findById(interventionId);
@@ -195,6 +273,14 @@ public class InterventionService {
         interventionRepository.saveAndFlush(intervention);
     }
 
+    /**
+     * Traite une boîte après la fin d'une intervention.
+     * Met à jour l'état de la boîte et de son matériel, crée automatiquement
+     * une demande de stérilisation puis l'envoie au service de stérilisation.
+     *
+     * @param interventionBoite association entre l'intervention et la boîte
+     * @param intervention intervention terminée
+     */
     private void traiterBoiteApresIntervention(InterventionBoite interventionBoite, Intervention intervention) {
         BoiteChirurgicale boite = interventionBoite.getBoiteChirurgicale();
 
@@ -221,11 +307,27 @@ public class InterventionService {
         demandeSterilisationService.envoyerDemande(demande.getId());
     }
 
+    /**
+     * Retourne l'ensemble des interventions enregistrées.
+     *
+     * @return la liste de toutes les interventions
+     */
     @Transactional(readOnly = true)
     public List<Intervention> findAll() {
         return interventionRepository.findAll();
     }
 
+    /**
+     * Vérifie qu'un patient ne possède pas déjà une intervention
+     * sur le créneau demandé.
+     *
+     * @param patientId identifiant du patient
+     * @param debut début du nouveau créneau
+     * @param fin fin du nouveau créneau
+     * @param interventionIgnoreeId intervention à ignorer lors d'une modification
+     * @throws IllegalArgumentException si le patient possède déjà une intervention
+     *                                  sur ce créneau
+     */
     private void verifierDisponibilitePatient(Long patientId,
                                               LocalDateTime debut,
                                               LocalDateTime fin,
@@ -244,6 +346,16 @@ public class InterventionService {
         }
     }
 
+    /**
+     * Vérifie qu'une salle n'est pas déjà utilisée par une autre intervention
+     * sur le créneau demandé.
+     *
+     * @param salleId identifiant de la salle
+     * @param debut début du nouveau créneau
+     * @param fin fin du nouveau créneau
+     * @param interventionIgnoreeId intervention à ignorer lors d'une modification
+     * @throws IllegalArgumentException si la salle est déjà occupée
+     */
     private void verifierDisponibiliteSalle(Long salleId,
                                             LocalDateTime debut,
                                             LocalDateTime fin,
@@ -262,6 +374,17 @@ public class InterventionService {
         }
     }
 
+    /**
+     * Vérifie que les membres du personnel sélectionnés possèdent tous un rôle
+     * et ne sont pas déjà affectés à une autre intervention sur le même créneau.
+     *
+     * @param personnelsAvecRoles personnels sélectionnés et leurs rôles
+     * @param debut début du nouveau créneau
+     * @param fin fin du nouveau créneau
+     * @param interventionIgnoreeId intervention à ignorer lors d'une modification
+     * @throws IllegalArgumentException si aucun personnel n'est sélectionné,
+     *                                  si un rôle est absent ou si un conflit existe
+     */
     private void verifierDisponibilitePersonnel(Map<Long, RoleIntervention> personnelsAvecRoles,
                                                 LocalDateTime debut,
                                                 LocalDateTime fin,
@@ -291,6 +414,18 @@ public class InterventionService {
         }
     }
 
+    /**
+     * Vérifie que les boîtes sélectionnées existent, sont disponibles
+     * et ne sont pas déjà réservées pour une autre intervention
+     * sur le même créneau.
+     *
+     * @param boiteIds identifiants des boîtes sélectionnées
+     * @param debut début du nouveau créneau
+     * @param fin fin du nouveau créneau
+     * @param interventionIgnoreeId intervention à ignorer lors d'une modification
+     * @throws IllegalArgumentException si les boîtes sont invalides,
+     *                                  indisponibles ou déjà réservées
+     */
     private void verifierDisponibiliteBoites(List<Long> boiteIds,
                                              LocalDateTime debut,
                                              LocalDateTime fin,
@@ -337,6 +472,14 @@ public class InterventionService {
         }
     }
 
+    /**
+     * Vérifie si un nouveau créneau chevauche celui d'une intervention existante.
+     *
+     * @param nouveauDebut début du nouveau créneau
+     * @param nouveauFin fin du nouveau créneau
+     * @param existante intervention existante à comparer
+     * @return true si les deux créneaux se chevauchent, false sinon
+     */
     private boolean chevauche(LocalDateTime nouveauDebut, LocalDateTime nouveauFin, Intervention existante) {
         LocalDateTime ancienDebut = existante.getDateHeureDebut();
         LocalDateTime ancienFin = ancienDebut.plusMinutes(existante.getDureePrevue());
@@ -344,6 +487,12 @@ public class InterventionService {
         return nouveauDebut.isBefore(ancienFin) && nouveauFin.isAfter(ancienDebut);
     }
 
+    /**
+     * Retourne les statuts d'intervention considérés comme bloquants
+     * lors de la vérification des disponibilités.
+     *
+     * @return la liste des statuts bloquant une ressource
+     */
     private List<StatutIntervention> statutsBloquants() {
         return List.of(
                 StatutIntervention.PLANIFIEE,
@@ -351,6 +500,12 @@ public class InterventionService {
         );
     }
 
+    /**
+     * Recherche les boîtes chirurgicales actuellement disponibles
+     * pour être affectées à une intervention.
+     *
+     * @return la liste des boîtes en stock stérile ou actives
+     */
     @Transactional(readOnly = true)
     public List<BoiteChirurgicale> findBoitesDisponibles() {
         return boiteChirurgicaleRepository.findAll().stream()
@@ -361,6 +516,13 @@ public class InterventionService {
                 .toList();
     }
 
+    /**
+     * Recherche une intervention à partir de son identifiant.
+     *
+     * @param id identifiant de l'intervention
+     * @return l'intervention correspondante
+     * @throws IllegalArgumentException si l'intervention est introuvable
+     */
     @Transactional(readOnly = true)
     public Intervention findById(Long id) {
         return interventionRepository.findById(id)
@@ -368,6 +530,14 @@ public class InterventionService {
                         new IllegalArgumentException("Intervention introuvable"));
     }
 
+    /**
+     * Annule une intervention et remet les boîtes qui lui étaient associées
+     * dans un état disponible et stérile.
+     *
+     * @param id identifiant de l'intervention à annuler
+     * @throws IllegalArgumentException si l'intervention est introuvable
+     *                                  ou déjà terminée
+     */
     @Transactional
     public void annulerIntervention(Long id) {
         Intervention intervention = findById(id);
@@ -392,12 +562,27 @@ public class InterventionService {
     }
 
 
+    /**
+     * Supprime une intervention enregistrée.
+     *
+     * @param id identifiant de l'intervention à supprimer
+     * @throws IllegalArgumentException si l'intervention est introuvable
+     */
     @Transactional
     public void deleteIntervention(Long id) {
         Intervention intervention = findById(id);
         interventionRepository.delete(intervention);
     }
 
+    /**
+     * Démarre une intervention planifiée.
+     * L'intervention passe à l'état EN_COURS et les boîtes associées
+     * ainsi que leurs matériels sont marqués comme étant utilisés.
+     *
+     * @param interventionId identifiant de l'intervention à démarrer
+     * @throws IllegalArgumentException si l'intervention est introuvable,
+     *                                  annulée, terminée ou déjà en cours
+     */
     @Transactional
     public void demarrerIntervention(Long interventionId) {
         Intervention intervention = findById(interventionId);
@@ -430,6 +615,18 @@ public class InterventionService {
         interventionRepository.saveAndFlush(intervention);
     }
 
+    /**
+     * Modifie le créneau d'une intervention existante.
+     * Vérifie la validité du nouveau créneau et la disponibilité
+     * de toutes les ressources avant d'appliquer la modification.
+     *
+     * @param interventionId identifiant de l'intervention à déplacer
+     * @param nouveauDebut nouvelle date et heure de début
+     * @param nouvelleFin nouvelle date et heure de fin
+     * @throws IllegalArgumentException si le nouveau créneau est invalide,
+     *                                  si l'intervention ne peut pas être modifiée
+     *                                  ou si une ressource n'est pas disponible
+     */
     @Transactional
     public void deplacerIntervention(Long interventionId,
                                      LocalDateTime nouveauDebut,
@@ -479,11 +676,31 @@ public class InterventionService {
         interventionRepository.saveAndFlush(intervention);
     }
 
+    /**
+     * Modifie les horaires et la durée d'une intervention à partir
+     * d'un nouveau début et d'une nouvelle fin.
+     *
+     * @param interventionId identifiant de l'intervention
+     * @param nouveauDebut nouvelle date et heure de début
+     * @param nouvelleFin nouvelle date et heure de fin
+     * @throws IllegalArgumentException si la modification n'est pas autorisée
+     *                                  ou si le nouveau créneau provoque un conflit
+     */
     @Transactional
     public void redimensionnerIntervention(Long interventionId, LocalDateTime nouveauDebut, LocalDateTime nouvelleFin) {
         deplacerIntervention(interventionId, nouveauDebut, nouvelleFin);
     }
 
+    /**
+     * Vérifie qu'une intervention peut être déplacée ou redimensionnée
+     * et que le nouveau créneau est valide.
+     *
+     * @param intervention intervention à modifier
+     * @param nouveauDebut nouvelle date et heure de début
+     * @param nouvelleFin nouvelle date et heure de fin
+     * @throws IllegalArgumentException si le créneau est invalide
+     *                                  ou si l'intervention est terminée ou annulée
+     */
     private void verifierModificationPlanningPossible(Intervention intervention, LocalDateTime nouveauDebut, LocalDateTime nouvelleFin) {
         if (nouveauDebut == null || nouvelleFin == null) {
             throw new IllegalArgumentException("Le nouveau créneau est invalide");
@@ -502,6 +719,14 @@ public class InterventionService {
         }
     }
 
+    /**
+     * Modifie simultanément le statut d'une boîte chirurgicale
+     * et l'état de toutes les unités de matériel qu'elle contient.
+     *
+     * @param boite boîte chirurgicale concernée
+     * @param statutBoite nouveau statut de la boîte
+     * @param etatMateriel nouvel état à appliquer aux unités de matériel
+     */
     private void changerEtatBoiteEtMateriels(BoiteChirurgicale boite,
                                              StatutBoite statutBoite,
                                              EtatMateriel etatMateriel) {

@@ -1,16 +1,17 @@
 package com.example.views.boite;
 
 import com.example.base.ui.ViewTitle;
-import com.example.entity.BoiteChirurgicale;
-import com.example.entity.BoiteMateriel;
-import com.example.entity.MouvementBoite;
+import com.example.entity.*;
+import com.example.entity.enums.StatutBoite;
 import com.example.service.BoiteChirurgicaleService;
+import com.example.service.IncidentSterilisationService;
 import com.example.service.MouvementBoiteService;
 import com.example.service.UniteMaterielService;
 import com.example.views.components.BoiteForm;
 import com.example.views.components.GridDialog;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
+import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.html.Span;
@@ -23,7 +24,10 @@ import com.vaadin.flow.router.Menu;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Route("boites")
 @PageTitle("Boîtes chirurgicales")
@@ -33,6 +37,7 @@ public class BoiteChirurgicaleListView extends VerticalLayout {
     private final BoiteChirurgicaleService boiteService;
     private final UniteMaterielService uniteMaterielService;
     private final MouvementBoiteService mouvementBoiteService;
+    private final IncidentSterilisationService incidentService;
 
     private final TextField searchField;
     private final Grid<BoiteChirurgicale> boiteGrid;
@@ -40,11 +45,13 @@ public class BoiteChirurgicaleListView extends VerticalLayout {
     public BoiteChirurgicaleListView(
             BoiteChirurgicaleService boiteService,
             UniteMaterielService uniteMaterielService,
-            MouvementBoiteService mouvementBoiteService
+            MouvementBoiteService mouvementBoiteService,
+            IncidentSterilisationService incidentService
     ) {
         this.boiteService = boiteService;
         this.uniteMaterielService = uniteMaterielService;
         this.mouvementBoiteService = mouvementBoiteService;
+        this.incidentService = incidentService;
 
         searchField = new TextField();
         searchField.setPlaceholder("Rechercher par code, nom, priorité, département ou spécialité");
@@ -120,9 +127,20 @@ public class BoiteChirurgicaleListView extends VerticalLayout {
             Button mouvementsBtn = new Button("Mouvements");
             mouvementsBtn.addClickListener(_ -> openMouvementsDialog(boite));
 
-            HorizontalLayout actions = new HorizontalLayout(voirBtn, mouvementsBtn, modifierBtn, supprimerBtn);
-            actions.setWrap(false);
+            HorizontalLayout actions = new HorizontalLayout(
+                    voirBtn,
+                    mouvementsBtn
+            );
 
+            if (boite.getStatut() == StatutBoite.INCOMPLETE) {
+                Button completerBtn = new Button("Compléter");
+                completerBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+                completerBtn.addClickListener(_ -> openCompleterDialog(boite));
+
+                actions.add(completerBtn);
+            }
+
+            actions.add(modifierBtn, supprimerBtn);
             return actions;
         }).setHeader("Actions").setWidth("450px").setFlexGrow(0);
 
@@ -283,7 +301,7 @@ public class BoiteChirurgicaleListView extends VerticalLayout {
         Dialog dialog = new Dialog();
         dialog.setHeaderTitle("Confirmation de suppression");
 
-        Button confirmBtn = new Button("Oui, supprimer", event -> {
+        Button confirmBtn = new Button("Oui, supprimer", _ -> {
             try {
                 boiteService.deleteBoite(boite);
                 refreshGrid();
@@ -347,5 +365,238 @@ public class BoiteChirurgicaleListView extends VerticalLayout {
                 "Mouvements de la boîte : " + boite.getCodeBoite(),
                 mouvementGrid
         ).open();
+    }
+
+    private void openCompleterDialog(
+            BoiteChirurgicale boite
+    ) {
+        List<IncidentSterilisation> incidents =
+                incidentService.findIncidentsNonRemplacesByBoite(
+                        boite.getId()
+                );
+
+        if (incidents.isEmpty()) {
+            Notification.show(
+                    "Aucun matériel à remplacer",
+                    3000,
+                    Notification.Position.BOTTOM_END
+            ).addThemeVariants(
+                    NotificationVariant.LUMO_PRIMARY
+            );
+
+            return;
+        }
+
+        Dialog dialog = new Dialog();
+        dialog.setHeaderTitle(
+                "Compléter la boîte : " + boite.getCodeBoite()
+        );
+        dialog.setWidth("750px");
+        dialog.setMaxWidth("95vw");
+
+        VerticalLayout content = new VerticalLayout();
+        content.setPadding(false);
+        content.setSpacing(true);
+
+        Map<IncidentSterilisation, ComboBox<UniteMateriel>>
+                selections = new LinkedHashMap<>();
+
+        ajouterLignesRemplacement(
+                content,
+                incidents,
+                selections
+        );
+
+        content.add(
+                createActionsRemplacement(
+                        dialog,
+                        boite,
+                        selections
+                )
+        );
+
+        dialog.add(content);
+        dialog.open();
+    }
+
+    private void ajouterLignesRemplacement(
+            VerticalLayout content,
+            List<IncidentSterilisation> incidents,
+            Map<IncidentSterilisation,
+                    ComboBox<UniteMateriel>> selections
+    ) {
+        for (IncidentSterilisation incident : incidents) {
+
+            UniteMateriel uniteRetiree =
+                    incident.getUniteMateriel();
+
+            Span materielLabel = new Span(
+                    uniteRetiree.getMateriel().getNomMateriel()
+                            + " — "
+                            + uniteRetiree.getCodeInventaire()
+            );
+
+            materielLabel.getStyle()
+                    .set("font-weight", "600")
+                    .set("min-width", "250px");
+
+            ComboBox<UniteMateriel> remplacementComboBox =
+                    new ComboBox<>(
+                            "Unité de remplacement"
+                    );
+
+            remplacementComboBox.setItemLabelGenerator(
+                    unite ->
+                            unite.getCodeInventaire()
+                                    + " — "
+                                    + unite.getMateriel()
+                                    .getNomMateriel()
+            );
+
+            List<UniteMateriel> unitesDisponibles =
+                    boiteService
+                            .findUnitesDisponiblesPourRemplacement(
+                                    incident.getId()
+                            );
+
+            remplacementComboBox.setItems(
+                    unitesDisponibles
+            );
+
+            remplacementComboBox.setPlaceholder(
+                    unitesDisponibles.isEmpty()
+                            ? "Aucune unité disponible"
+                            : "Sélectionner une unité stérile"
+            );
+
+            remplacementComboBox.setEnabled(
+                    !unitesDisponibles.isEmpty()
+            );
+
+            remplacementComboBox.setClearButtonVisible(true);
+            remplacementComboBox.setWidth("350px");
+
+            HorizontalLayout ligne =
+                    new HorizontalLayout(
+                            materielLabel,
+                            remplacementComboBox
+                    );
+
+            ligne.setWidthFull();
+            ligne.setAlignItems(Alignment.BASELINE);
+            ligne.setFlexGrow(
+                    1,
+                    remplacementComboBox
+            );
+
+            content.add(ligne);
+
+            selections.put(
+                    incident,
+                    remplacementComboBox
+            );
+        }
+    }
+
+    private HorizontalLayout createActionsRemplacement(
+            Dialog dialog,
+            BoiteChirurgicale boite,
+            Map<IncidentSterilisation,
+                    ComboBox<UniteMateriel>> selections
+    ) {
+        Button validerBtn =
+                new Button("Valider les remplacements");
+
+        validerBtn.addThemeVariants(
+                ButtonVariant.LUMO_PRIMARY
+        );
+
+        Button annulerBtn = new Button(
+                "Annuler",
+                event -> dialog.close()
+        );
+
+        validerBtn.addClickListener(event ->
+                validerRemplacements(
+                        dialog,
+                        boite,
+                        selections
+                )
+        );
+
+        return new HorizontalLayout(
+                validerBtn,
+                annulerBtn
+        );
+    }
+
+    private void validerRemplacements(
+            Dialog dialog,
+            BoiteChirurgicale boite,
+            Map<IncidentSterilisation,
+                    ComboBox<UniteMateriel>> selections
+    ) {
+        boolean aucuneSelection =
+                selections.values()
+                        .stream()
+                        .allMatch(comboBox ->
+                                comboBox.getValue() == null
+                        );
+
+        if (aucuneSelection) {
+            Notification.show(
+                    "Veuillez sélectionner au moins une unité de remplacement",
+                    4000,
+                    Notification.Position.BOTTOM_END
+            ).addThemeVariants(
+                    NotificationVariant.LUMO_ERROR
+            );
+
+            return;
+        }
+
+        Map<Long, Long> remplacements =
+                new LinkedHashMap<>();
+
+        selections.forEach((incident, comboBox) -> {
+            UniteMateriel uniteSelectionnee =
+                    comboBox.getValue();
+
+            if (uniteSelectionnee != null) {
+                remplacements.put(
+                        incident.getId(),
+                        uniteSelectionnee.getId()
+                );
+            }
+        });
+
+        try {
+            boiteService.remplacerMateriels(
+                    boite.getId(),
+                    remplacements
+            );
+
+            Notification.show(
+                    remplacements.size() == 1
+                            ? "Le matériel a été remplacé"
+                            : "Les matériels ont été remplacés",
+                    3000,
+                    Notification.Position.BOTTOM_END
+            ).addThemeVariants(
+                    NotificationVariant.LUMO_SUCCESS
+            );
+
+            refreshGrid();
+            dialog.close();
+
+        } catch (IllegalArgumentException exception) {
+            Notification.show(
+                    exception.getMessage(),
+                    4000,
+                    Notification.Position.BOTTOM_END
+            ).addThemeVariants(
+                    NotificationVariant.LUMO_ERROR
+            );
+        }
     }
 }

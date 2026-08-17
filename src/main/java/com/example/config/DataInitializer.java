@@ -65,10 +65,10 @@ public class DataInitializer implements CommandLineRunner {
         }
 
         if (personnelRepository.count() == 0) {
-            personnelRepository.save(new Personnel("MED001", "Karimi", "Omar", "Chirurgie"));
-            personnelRepository.save(new Personnel("MED002", "Bennani", "Nadia", "Anesthésie"));
-            personnelRepository.save(new Personnel("INF001", "Mansouri", "Imane", "Infirmier bloc"));
-            personnelRepository.save(new Personnel("INF002", "Rami", "Sofia", "Infirmier bloc"));
+            personnelRepository.save(new Personnel("MED001", "Karimi", "Omar", "Chirurgie", EtatPersonnel.DISPONIBLE));
+            personnelRepository.save(new Personnel("MED002", "Bennani", "Nadia", "Anesthésie", EtatPersonnel.DISPONIBLE));
+            personnelRepository.save(new Personnel("INF001", "Mansouri", "Imane", "Infirmier bloc", EtatPersonnel.DISPONIBLE));
+            personnelRepository.save(new Personnel("INF002", "Rami", "Sofia", "Infirmier bloc", EtatPersonnel.ABSENT));
         }
 
         createMaterielIfEmpty();
@@ -164,12 +164,12 @@ public class DataInitializer implements CommandLineRunner {
             }
 
             Machine laveur = machines.stream()
-                    .filter(m -> m.getTypeMachine() == TypeMachine.LAVAGE)
+                    .filter(machine -> machine.getTypeMachine() == TypeMachine.LAVAGE)
                     .findFirst()
                     .orElse(null);
 
             Machine autoclave = machines.stream()
-                    .filter(m -> m.getTypeMachine() == TypeMachine.STERILISATION)
+                    .filter(machine -> machine.getTypeMachine() == TypeMachine.STERILISATION)
                     .findFirst()
                     .orElse(null);
 
@@ -180,6 +180,7 @@ public class DataInitializer implements CommandLineRunner {
             BoiteChirurgicale boiteRefusee = boites.get(0);
             BoiteChirurgicale boiteEchec = boites.get(1);
 
+            // Scénario 1 : demande refusée
             demandeSterilisationService.createDemande(
                     "DEM-REFUS-001",
                     LocalDate.now().plusDays(1),
@@ -189,15 +190,27 @@ public class DataInitializer implements CommandLineRunner {
                     "Demande de démonstration : refusée par le service de stérilisation"
             );
 
-            DemandeSterilisation demandeRefusee = demandeSterilisationService.findAll().stream()
-                    .filter(d -> d.getCodeDemande().equals("DEM-REFUS-001"))
-                    .findFirst()
-                    .orElseThrow();
+            DemandeSterilisation demandeRefusee =
+                    demandeSterilisationService.findAll().stream()
+                            .filter(demande ->
+                                    "DEM-REFUS-001".equals(demande.getCodeDemande())
+                            )
+                            .findFirst()
+                            .orElseThrow(() ->
+                                    new IllegalStateException(
+                                            "La demande DEM-REFUS-001 est introuvable"
+                                    )
+                            );
 
-            demandeSterilisationService.envoyerDemande(demandeRefusee.getId());
-            demandeSterilisationService.refuserDemande(demandeRefusee.getId());
+            demandeSterilisationService.envoyerDemande(
+                    demandeRefusee.getId()
+            );
 
+            demandeSterilisationService.refuserDemande(
+                    demandeRefusee.getId()
+            );
 
+            // Scénario 2 : processus en échec à cause d'un emballage déchiré
             demandeSterilisationService.createDemande(
                     "DEM-ECHEC-001",
                     LocalDate.now().plusDays(1),
@@ -207,13 +220,25 @@ public class DataInitializer implements CommandLineRunner {
                     "Demande de démonstration : cycle avec incident"
             );
 
-            DemandeSterilisation demandeEchec = demandeSterilisationService.findAll().stream()
-                    .filter(d -> d.getCodeDemande().equals("DEM-ECHEC-001"))
-                    .findFirst()
-                    .orElseThrow();
+            DemandeSterilisation demandeEchec =
+                    demandeSterilisationService.findAll().stream()
+                            .filter(demande ->
+                                    "DEM-ECHEC-001".equals(demande.getCodeDemande())
+                            )
+                            .findFirst()
+                            .orElseThrow(() ->
+                                    new IllegalStateException(
+                                            "La demande DEM-ECHEC-001 est introuvable"
+                                    )
+                            );
 
-            demandeSterilisationService.envoyerDemande(demandeEchec.getId());
-            demandeSterilisationService.accepterDemande(demandeEchec.getId());
+            demandeSterilisationService.envoyerDemande(
+                    demandeEchec.getId()
+            );
+
+            demandeSterilisationService.accepterDemande(
+                    demandeEchec.getId()
+            );
 
             processusSterilisationService.creerProcessus(
                     demandeEchec.getId(),
@@ -222,28 +247,40 @@ public class DataInitializer implements CommandLineRunner {
                     "Processus de démonstration avec incident"
             );
 
-            ProcessusSterilisation processus = processusSterilisationService.findAll().stream()
-                    .filter(p -> p.getDemandeSterilisation().getCodeDemande().equals("DEM-ECHEC-001"))
-                    .findFirst()
-                    .orElseThrow();
+            ProcessusSterilisation processus =
+                    processusSterilisationService.findAll().stream()
+                            .filter(p ->
+                                    "DEM-ECHEC-001".equals(
+                                            p.getDemandeSterilisation()
+                                                    .getCodeDemande()
+                                    )
+                            )
+                            .findFirst()
+                            .orElseThrow(() ->
+                                    new IllegalStateException(
+                                            "Le processus associé à DEM-ECHEC-001 est introuvable"
+                                    )
+                            );
 
-            processusSterilisationService.avancerProcessus(processus.getId()); // LAVAGE
-            processusSterilisationService.avancerProcessus(processus.getId()); // CONDITIONNEMENT
+            processusSterilisationService.avancerProcessus(
+                    processus.getId()
+            ); // EN_ATTENTE -> LAVAGE
 
-            incidentSterilisationService.createIncident(
-                    processus.getId(),
-                    autoclave.getId(),
-                    TypeIncidentSterilisation.EMBALLAGE_DECHIRE,
-                    GraviteIncident.CRITIQUE,
-                    "Emballage déchiré détecté avant passage à l'autoclave"
-            );
+            processusSterilisationService.avancerProcessus(
+                    processus.getId()
+            ); // LAVAGE -> CONDITIONNEMENT
 
             processusSterilisationService.mettreEnEchec(
                     processus.getId(),
                     "Échec du processus : emballage déchiré"
             );
 
-        } catch (Exception ignored) {
+        } catch (Exception exception) {
+            System.err.println(
+                    "Erreur pendant l'initialisation des scénarios de stérilisation : "
+                            + exception.getMessage()
+            );
+
         }
     }
 }

@@ -16,6 +16,14 @@ public class HistoriqueProcessusService {
         this.historiqueProcessusRepository = historiqueProcessusRepository;
     }
 
+    /**
+     * Retourne l'historique d'un processus de stérilisation,
+     * trié chronologiquement par date d'action.
+     *
+     * @param processusId identifiant du processus de stérilisation concerné
+     * @return la liste des entrées de l'historique du processus,
+     *         classées de la plus ancienne à la plus récente
+     */
     @Transactional(readOnly = true)
     public List<HistoriqueProcessus> findByProcessus(Long processusId) {
         return historiqueProcessusRepository.findByProcessusIdOrderByDateActionAsc(processusId);

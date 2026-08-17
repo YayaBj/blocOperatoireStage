@@ -1,5 +1,6 @@
 package com.example.entity;
 
+import com.example.entity.enums.EtatPersonnel;
 import jakarta.persistence.*;
 import java.util.List;
 
@@ -23,16 +24,21 @@ public class Personnel {
     @Column(name = "specialite", nullable = false)
     private String specialite;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private EtatPersonnel etat;
+
     @OneToMany(mappedBy = "personnel")
     private List<AffectationPersonnel> affectations;
 
     public Personnel() {}
 
-    public Personnel(String matricule, String nomPersonnel, String prenomPersonnel, String specialite) {
+    public Personnel(String matricule, String nomPersonnel, String prenomPersonnel, String specialite, EtatPersonnel etat) {
         this.matricule = matricule;
         this.nomPersonnel = nomPersonnel;
         this.prenomPersonnel = prenomPersonnel;
         this.specialite = specialite;
+        this.etat = etat;
     }
 
     public Long getId() {
@@ -77,5 +83,13 @@ public class Personnel {
 
     public void setAffectations(List<AffectationPersonnel> affectations) {
         this.affectations = affectations;
+    }
+
+    public EtatPersonnel getEtat() {
+        return etat;
+    }
+
+    public void setEtat(EtatPersonnel etat) {
+        this.etat = etat;
     }
 }

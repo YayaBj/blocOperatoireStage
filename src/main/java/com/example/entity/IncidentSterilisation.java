@@ -36,20 +36,32 @@ public class IncidentSterilisation {
     @JoinColumn(name = "machine_id")
     private Machine machine;
 
+    @ManyToOne
+    @JoinColumn(name = "unite_materiel_id")
+    private UniteMateriel uniteMateriel;
+
+    @ManyToOne
+    @JoinColumn(name = "unite_remplacement_id")
+    private UniteMateriel uniteRemplacement;
+
     public IncidentSterilisation() {}
 
-    public IncidentSterilisation(LocalDateTime dateIncident,
-                                 TypeIncidentSterilisation typeIncident,
-                                 GraviteIncident gravite,
-                                 String description,
-                                 ProcessusSterilisation processusSterilisation,
-                                 Machine machine) {
+    public IncidentSterilisation(
+            LocalDateTime dateIncident,
+            TypeIncidentSterilisation typeIncident,
+            GraviteIncident gravite,
+            String description,
+            ProcessusSterilisation processusSterilisation,
+            Machine machine,
+            UniteMateriel uniteMateriel
+    ) {
         this.dateIncident = dateIncident;
         this.typeIncident = typeIncident;
         this.gravite = gravite;
         this.description = description;
         this.processusSterilisation = processusSterilisation;
         this.machine = machine;
+        this.uniteMateriel = uniteMateriel;
     }
 
     public Long getId() {
@@ -102,5 +114,21 @@ public class IncidentSterilisation {
 
     public void setMachine(Machine machine) {
         this.machine = machine;
+    }
+
+    public UniteMateriel getUniteMateriel() {
+        return uniteMateriel;
+    }
+
+    public void setUniteMateriel(UniteMateriel uniteMateriel) {
+        this.uniteMateriel = uniteMateriel;
+    }
+
+    public UniteMateriel getUniteRemplacement() {
+        return uniteRemplacement;
+    }
+
+    public void setUniteRemplacement(UniteMateriel uniteRemplacement) {
+        this.uniteRemplacement = uniteRemplacement;
     }
 }

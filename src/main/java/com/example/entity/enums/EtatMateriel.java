@@ -6,5 +6,7 @@ public enum EtatMateriel {
     EN_UTILISATION,
     EN_STERILISATION,
     INDISPONIBLE,
+    ENDOMMAGE,
+    PERDU,
     HS
 }

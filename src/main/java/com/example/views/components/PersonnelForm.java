@@ -1,8 +1,10 @@
 package com.example.views.components;
 
 import com.example.entity.Personnel;
+import com.example.entity.enums.EtatPersonnel;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
+import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
@@ -17,6 +19,7 @@ public class PersonnelForm extends VerticalLayout {
     private final TextField nomPersonnel = new TextField("Nom");
     private final TextField prenomPersonnel = new TextField("Prénom");
     private final TextField specialite = new TextField("Spécialité");
+    private final ComboBox<EtatPersonnel    > etat = new ComboBox<>("État");
 
     public PersonnelForm(Personnel personnel,
                          String submitLabel,
@@ -34,7 +37,7 @@ public class PersonnelForm extends VerticalLayout {
         Div identitySection = createSection(
                 row(matricule),
                 row(nomPersonnel, prenomPersonnel),
-                row(specialite)
+                row(specialite, etat)
         );
 
         HorizontalLayout actions = new HorizontalLayout(submitBtn);
@@ -49,12 +52,16 @@ public class PersonnelForm extends VerticalLayout {
         nomPersonnel.setPlaceholder("Ex : Karimi");
         prenomPersonnel.setPlaceholder("Ex : Omar");
         specialite.setPlaceholder("Ex : Chirurgie");
+        etat.setItems(EtatPersonnel.values());
+        etat.setItemLabelGenerator(Enum::name);
+        etat.setWidthFull();
 
         if (personnel != null) {
             matricule.setValue(personnel.getMatricule() == null ? "" : personnel.getMatricule());
             nomPersonnel.setValue(personnel.getNomPersonnel() == null ? "" : personnel.getNomPersonnel());
             prenomPersonnel.setValue(personnel.getPrenomPersonnel() == null ? "" : personnel.getPrenomPersonnel());
             specialite.setValue(personnel.getSpecialite() == null ? "" : personnel.getSpecialite());
+            etat.setValue(personnel.getEtat());
         }
 
         matricule.setWidthFull();
@@ -100,7 +107,8 @@ public class PersonnelForm extends VerticalLayout {
                 matricule.getValue(),
                 nomPersonnel.getValue(),
                 prenomPersonnel.getValue(),
-                specialite.getValue()
+                specialite.getValue(),
+                etat.getValue()
         );
     }
 
@@ -108,6 +116,7 @@ public class PersonnelForm extends VerticalLayout {
             String matricule,
             String nomPersonnel,
             String prenomPersonnel,
-            String specialite
+            String specialite,
+            EtatPersonnel etat
     ) {}
 }

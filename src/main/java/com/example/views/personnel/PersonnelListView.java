@@ -61,6 +61,7 @@ public class PersonnelListView extends VerticalLayout {
         personnelGrid.addColumn(Personnel::getNomPersonnel).setHeader("Nom").setSortable(true);
         personnelGrid.addColumn(Personnel::getPrenomPersonnel).setHeader("Prénom").setSortable(true);
         personnelGrid.addColumn(Personnel::getSpecialite).setHeader("Spécialité").setSortable(true);
+        personnelGrid.addColumn(Personnel::getEtat).setHeader("Etat").setSortable(true);
 
         personnelGrid.addComponentColumn(personnel -> {
             Button modifierBtn = new Button("Modifier");
@@ -74,11 +75,16 @@ public class PersonnelListView extends VerticalLayout {
                         "Voulez-vous vraiment supprimer : "
                                 + personnel.getNomPersonnel() + " " + personnel.getPrenomPersonnel() + " ?",
                         () -> {
-                            personnelService.deletePersonnel(personnel);
-                            refreshGrid();
+                            try {
+                                personnelService.deletePersonnel(personnel);
+                                refreshGrid();
 
-                            Notification.show("Personnel supprimé", 3000, Notification.Position.BOTTOM_END)
-                                    .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+                                Notification.show("Personnel supprimé", 3000, Notification.Position.BOTTOM_END)
+                                        .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+                            } catch (IllegalArgumentException e) {
+                                Notification.show(e.getMessage(), 4000, Notification.Position.BOTTOM_END)
+                                        .addThemeVariants(NotificationVariant.LUMO_ERROR);
+                            }
                         }
                 );
 
@@ -112,7 +118,8 @@ public class PersonnelListView extends VerticalLayout {
                                 data.matricule(),
                                 data.nomPersonnel(),
                                 data.prenomPersonnel(),
-                                data.specialite()
+                                data.specialite(),
+                                data.etat()
                         );
 
                         Notification.show("Personnel ajouté", 3000, Notification.Position.BOTTOM_END)
@@ -148,7 +155,8 @@ public class PersonnelListView extends VerticalLayout {
                                 data.matricule(),
                                 data.nomPersonnel(),
                                 data.prenomPersonnel(),
-                                data.specialite()
+                                data.specialite(),
+                                data.etat()
                         );
 
                         Notification.show("Personnel modifié", 3000, Notification.Position.BOTTOM_END)

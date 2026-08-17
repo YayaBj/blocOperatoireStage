@@ -21,6 +21,8 @@ import com.vaadin.flow.router.Menu;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 
+import java.util.List;
+
 @Route("processus-sterilisation")
 @PageTitle("Processus de stérilisation")
 @Menu(order = 10, icon = "icons/refresh.svg", title = "Stérilisation/Processus")
@@ -31,6 +33,7 @@ public class ProcessusSterilisationListView extends VerticalLayout {
     private final MachineService machineService;
     private final HistoriqueProcessusService historiqueService;
     private final IncidentSterilisationService incidentService;
+    private final BoiteChirurgicaleService boiteChirurgicaleService;
 
     private final TextField searchField;
     private final Grid<ProcessusSterilisation> processusGrid;
@@ -39,12 +42,14 @@ public class ProcessusSterilisationListView extends VerticalLayout {
                                           DemandeSterilisationService demandeService,
                                           MachineService machineService,
                                           HistoriqueProcessusService historiqueService,
-                                          IncidentSterilisationService incidentService) {
+                                          IncidentSterilisationService incidentService,
+                                          BoiteChirurgicaleService boiteChirurgicaleService) {
         this.processusService = processusService;
         this.demandeService = demandeService;
         this.machineService = machineService;
         this.historiqueService = historiqueService;
         this.incidentService = incidentService;
+        this.boiteChirurgicaleService = boiteChirurgicaleService;
 
         searchField = new TextField();
         searchField.setPlaceholder("Rechercher par demande, boîte, statut ou machine");
@@ -145,8 +150,12 @@ public class ProcessusSterilisationListView extends VerticalLayout {
                     () -> processusService.avancerProcessus(processus.getId())
             ));
 
-            Button echecBtn = new Button("Échec", _ -> openEchecDialog(processus));
-            echecBtn.addThemeVariants(ButtonVariant.LUMO_ERROR);
+            Button incidentBtn = new Button(
+                    "Déclarer un incident",
+                    _ -> openIncidentDialog(processus)
+            );
+
+            incidentBtn.addThemeVariants(ButtonVariant.LUMO_ERROR);
 
             Button historiqueBtn = new Button("Historique");
             historiqueBtn.addClickListener(_ ->
@@ -156,7 +165,7 @@ public class ProcessusSterilisationListView extends VerticalLayout {
             Button incidentsBtn = new Button("Incidents");
             incidentsBtn.addClickListener(_ -> openIncidentsDialog(processus));
 
-            HorizontalLayout actions = new HorizontalLayout(nextBtn, echecBtn, historiqueBtn, incidentsBtn);
+            HorizontalLayout actions = new HorizontalLayout(nextBtn, incidentsBtn, historiqueBtn, incidentBtn);
             actions.setWrap(false);
 
             return actions;
@@ -212,41 +221,75 @@ public class ProcessusSterilisationListView extends VerticalLayout {
         dialog.open();
     }
 
-    private void openEchecDialog(ProcessusSterilisation processus) {
+    private void openIncidentDialog(ProcessusSterilisation processus) {
         Dialog dialog = new Dialog();
         dialog.setHeaderTitle("Déclarer un incident / échec");
         dialog.setWidth("900px");
         dialog.setMaxWidth("95vw");
+
+        List<UniteMateriel> unitesBoite =
+                boiteChirurgicaleService.findUnitesByBoite(
+                        processus.getDemandeSterilisation()
+                                .getBoiteChirurgicale()
+                                .getId()
+                );
 
         IncidentProcessusForm form = new IncidentProcessusForm(
                 java.util.stream.Stream.of(
                         processus.getMachineLavage(),
                         processus.getMachineAutoclave()
                 ).filter(java.util.Objects::nonNull).toList(),
+
+                unitesBoite,
+
                 data -> {
                     try {
-                        incidentService.createIncident(
-                                processus.getId(),
-                                data.machineId(),
-                                data.typeIncident(),
-                                data.gravite(),
-                                data.description()
-                        );
+                        TypeIncidentSterilisation type = data.typeIncident();
 
-                        processusService.mettreEnEchec(
-                                processus.getId(),
-                                data.description()
-                        );
+                        boolean incidentMateriel =
+                                type == TypeIncidentSterilisation.MATERIEL_MANQUANT
+                                        || type == TypeIncidentSterilisation.MATERIEL_CASSE
+                                        || type == TypeIncidentSterilisation.MATERIEL_ENDOMMAGE
+                                        || type == TypeIncidentSterilisation.MATERIEL_PERDU;
 
-                        Notification.show("Incident enregistré et processus marqué en échec", 3000, Notification.Position.BOTTOM_END)
-                                .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+                        if (incidentMateriel) {
+                            incidentService.declarerIncidentMateriel(
+                                    processus.getId(),
+                                    data.uniteMaterielId(),
+                                    type,
+                                    data.gravite(),
+                                    data.description(),
+                                    data.arreterProcessus()
+                            );
+                        } else {
+                            incidentService.declarerIncidentProcessus(
+                                    processus.getId(),
+                                    data.machineId(),
+                                    type,
+                                    data.gravite(),
+                                    data.description()
+                            );
+                        }
+
+                        Notification.show(
+                                "Incident enregistré",
+                                3000,
+                                Notification.Position.BOTTOM_END
+                        ).addThemeVariants(
+                                NotificationVariant.LUMO_SUCCESS
+                        );
 
                         refreshGrid();
                         dialog.close();
 
                     } catch (IllegalArgumentException e) {
-                        Notification.show(e.getMessage(), 4000, Notification.Position.BOTTOM_END)
-                                .addThemeVariants(NotificationVariant.LUMO_ERROR);
+                        Notification.show(
+                                e.getMessage(),
+                                4000,
+                                Notification.Position.BOTTOM_END
+                        ).addThemeVariants(
+                                NotificationVariant.LUMO_ERROR
+                        );
                     }
                 }
         );

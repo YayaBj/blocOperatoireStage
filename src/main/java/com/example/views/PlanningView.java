@@ -2,7 +2,7 @@ package com.example.views;
 
 import com.example.base.ui.ViewTitle;
 import com.example.entity.*;
-import com.example.entity.enums.StatutIntervention;
+import com.example.entity.enums.*;
 import com.example.service.*;
 import com.example.views.components.InterventionForm;
 import com.vaadin.flow.component.button.Button;
@@ -35,17 +35,26 @@ public class PlanningView extends VerticalLayout {
     private final PatientService patientService;
     private final SalleService salleService;
     private final PersonnelService personnelService;
+    private final DemandeSterilisationService demandeService;
+    private final MachineService machineService;
+
+    private final HorizontalLayout dashboardCards;
 
     public PlanningView(
             InterventionService interventionService,
             PatientService patientService,
             SalleService salleService,
-            PersonnelService personnelService
+            PersonnelService personnelService,
+            DemandeSterilisationService demandeService,
+            MachineService machineService
+
     ) {
         this.patientService = patientService;
         this.salleService = salleService;
         this.personnelService = personnelService;
         this.interventionService = interventionService;
+        this.demandeService = demandeService;
+        this.machineService = machineService;
 
         FullCalendar calendar = FullCalendarBuilder.create().build();
         calendar.setOption(FullCalendar.Option.LOCALE, Locale.FRANCE);
@@ -78,7 +87,12 @@ public class PlanningView extends VerticalLayout {
 
         VerticalLayout toolbar = createPlanningToolbar(calendar, datePicker);
 
-        loadInterventions(calendar);
+        dashboardCards = new HorizontalLayout();
+        dashboardCards.addClassName("dashboard-cards");
+        dashboardCards.setWidthFull();
+        dashboardCards.setWrap(true);
+
+        refreshPlanning(calendar);
 
         calendar.addAttachListener(_ -> {
             calendar.changeView(CalendarViewImpl.TIME_GRID_WEEK);
@@ -92,7 +106,7 @@ public class PlanningView extends VerticalLayout {
 
         setSizeFull();
         addClassName("page-container");
-        add(toolbar, calendarCard);
+        add(toolbar, dashboardCards, calendarCard);
         expand(calendarCard);
     }
 
@@ -119,7 +133,7 @@ public class PlanningView extends VerticalLayout {
                         Notification.Position.BOTTOM_END
                 ).addThemeVariants(NotificationVariant.LUMO_SUCCESS);
 
-                loadInterventions(calendar);
+                refreshPlanning(calendar);
 
             } catch (IllegalArgumentException e) {
 
@@ -129,7 +143,7 @@ public class PlanningView extends VerticalLayout {
                         Notification.Position.BOTTOM_END
                 ).addThemeVariants(NotificationVariant.LUMO_ERROR);
 
-                loadInterventions(calendar);
+                refreshPlanning(calendar);
             }
         });
 
@@ -155,7 +169,7 @@ public class PlanningView extends VerticalLayout {
                         Notification.Position.BOTTOM_END
                 ).addThemeVariants(NotificationVariant.LUMO_SUCCESS);
 
-                loadInterventions(calendar);
+               refreshPlanning(calendar);
 
             } catch (IllegalArgumentException e) {
 
@@ -165,7 +179,7 @@ public class PlanningView extends VerticalLayout {
                         Notification.Position.BOTTOM_END
                 ).addThemeVariants(NotificationVariant.LUMO_ERROR);
 
-                loadInterventions(calendar);
+               refreshPlanning(calendar);
             }
         });
     }
@@ -240,8 +254,8 @@ public class PlanningView extends VerticalLayout {
 
         InterventionForm form = new InterventionForm(
                 patientService.findAll(),
-                salleService.findAll(),
-                personnelService.findAll(),
+                salleService.findByStatut(StatutSalle.DISPONIBLE),
+                personnelService.findByEtat(EtatPersonnel.DISPONIBLE),
                 interventionService.findBoitesDisponibles(),
                 start,
                 (int) Duration.between(start, end).toMinutes(),
@@ -262,7 +276,7 @@ public class PlanningView extends VerticalLayout {
                                 .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
 
                         dialog.close();
-                        loadInterventions(calendar);
+                       refreshPlanning(calendar);
 
                     } catch (IllegalArgumentException e) {
                         Notification.show(e.getMessage(), 4000, Notification.Position.BOTTOM_END)
@@ -345,7 +359,7 @@ public class PlanningView extends VerticalLayout {
 
             interventionService.annulerIntervention(intervention.getId());
 
-            loadInterventions(calendar);
+           refreshPlanning(calendar);
 
             dialog.close();
 
@@ -362,7 +376,7 @@ public class PlanningView extends VerticalLayout {
 
             interventionService.deleteIntervention(intervention.getId());
 
-            loadInterventions(calendar);
+           refreshPlanning(calendar);
 
             dialog.close();
 
@@ -379,7 +393,7 @@ public class PlanningView extends VerticalLayout {
             try {
                 interventionService.terminerIntervention(intervention.getId());
 
-                loadInterventions(calendar);
+               refreshPlanning(calendar);
 
                 dialog.close();
 
@@ -430,7 +444,7 @@ public class PlanningView extends VerticalLayout {
 
                 interventionService.demarrerIntervention(intervention.getId());
 
-                loadInterventions(calendar);
+               refreshPlanning(calendar);
 
                 dialog.close();
 
@@ -450,5 +464,55 @@ public class PlanningView extends VerticalLayout {
             }
         });
         return demarrerBtn;
+    }
+
+    private void refreshDashboardCards() {
+        dashboardCards.removeAll();
+
+        long interventionsAujourdhui = interventionService.findAll().stream()
+                .filter(intervention -> intervention.getDateHeureDebut() != null)
+                .filter(intervention -> intervention.getDateHeureDebut().toLocalDate().equals(LocalDate.now()))
+                .count();
+
+        long demandesEnAttente = demandeService.findAll().stream()
+                .filter(demande -> demande.getStatut() == StatutDemandeSterilisation.ENVOYEE)
+                .count();
+
+        long boitesDisponibles = interventionService.findBoitesDisponibles().size();
+
+        long machinesEnPanne = machineService.findAll().stream()
+                .filter(machine -> machine.getStatut() == StatutMachine.ERROR)
+                .count();
+
+        dashboardCards.add(
+                createDashboardCard("Interventions aujourd’hui", interventionsAujourdhui, "Opérations prévues ce jour", "dashboard-card-info"),
+                createDashboardCard("Demandes en attente", demandesEnAttente, "Demandes envoyées à traiter", "dashboard-card-warning"),
+                createDashboardCard("Boîtes disponibles", boitesDisponibles, "Boîtes utilisables au bloc", "dashboard-card-success"),
+                createDashboardCard("Machines en panne", machinesEnPanne, "Machines en erreur", "dashboard-card-danger")
+        );
+    }
+
+    private Div createDashboardCard(String title, long value, String subtitle, String styleClass) {
+        Div card = new Div();
+        card.addClassName("dashboard-card");
+        card.addClassName(styleClass);
+
+        Span valueSpan = new Span(String.valueOf(value));
+        valueSpan.addClassName("dashboard-card-value");
+
+        Span titleSpan = new Span(title);
+        titleSpan.addClassName("dashboard-card-title");
+
+        Span subtitleSpan = new Span(subtitle);
+        subtitleSpan.addClassName("dashboard-card-subtitle");
+
+        card.add(valueSpan, titleSpan, subtitleSpan);
+
+        return card;
+    }
+
+    private void refreshPlanning(FullCalendar calendar) {
+        loadInterventions(calendar);
+        refreshDashboardCards();
     }
 }

@@ -9,4 +9,5 @@ import java.util.List;
 public interface UniteMaterielRepository extends JpaRepository<UniteMateriel, Long> {
 
     List<UniteMateriel> findByEtat(EtatMateriel etat);
+
 }

@@ -14,4 +14,6 @@ public interface IncidentSterilisationRepository extends JpaRepository<IncidentS
     List<IncidentSterilisation> findByTypeIncident(TypeIncidentSterilisation typeIncident);
 
     List<IncidentSterilisation> findByGravite(GraviteIncident gravite);
+
+    List<IncidentSterilisation> findByProcessusSterilisationDemandeSterilisationBoiteChirurgicaleId(Long boiteId);
 }

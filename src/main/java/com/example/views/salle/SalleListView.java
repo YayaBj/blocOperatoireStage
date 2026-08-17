@@ -87,11 +87,16 @@ public class SalleListView extends VerticalLayout {
                 ConfirmDeleteDialog dialog = new ConfirmDeleteDialog(
                         "Voulez-vous vraiment supprimer la salle : " + salle.getNumeroSalle() + " ?",
                         () -> {
-                            salleService.deleteSalle(salle);
-                            refreshGrid();
+                            try {
+                                salleService.deleteSalle(salle);
+                                refreshGrid();
 
-                            Notification.show("Salle supprimée", 3000, Notification.Position.BOTTOM_END)
-                                    .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+                                Notification.show("Salle supprimée", 3000, Notification.Position.BOTTOM_END)
+                                        .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+                            } catch (IllegalArgumentException e) {
+                                Notification.show(e.getMessage(), 4000, Notification.Position.BOTTOM_END)
+                                        .addThemeVariants(NotificationVariant.LUMO_ERROR);
+                            }
                         }
                 );
 

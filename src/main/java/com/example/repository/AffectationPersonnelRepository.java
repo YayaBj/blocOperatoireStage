@@ -15,4 +15,6 @@ public interface AffectationPersonnelRepository extends JpaRepository<Affectatio
     );
 
     List<AffectationPersonnel> findByInterventionId(Long interventionId);
+
+    boolean existsByPersonnelId(Long personnelId);
 }

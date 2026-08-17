@@ -12,4 +12,10 @@ public interface InterventionRepository extends JpaRepository<Intervention, Long
     List<Intervention> findByPatientIdAndStatutInterventionIn(Long patientId, List<StatutIntervention> statuts);
 
     List<Intervention> findBySalleIdAndStatutInterventionIn(Long salleId, List<StatutIntervention> statuts);
+
+    boolean existsBySalleId(Long salleId);
+
+    boolean existsByInterventionBoitesBoiteChirurgicaleId(Long boiteId);
+
+    boolean existsByPatientId(Long patientId);
 }

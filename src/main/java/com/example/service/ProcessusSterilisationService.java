@@ -1,9 +1,6 @@
 package com.example.service;
 
-import com.example.entity.DemandeSterilisation;
-import com.example.entity.HistoriqueProcessus;
-import com.example.entity.Machine;
-import com.example.entity.ProcessusSterilisation;
+import com.example.entity.*;
 import com.example.entity.enums.*;
 import com.example.repository.DemandeSterilisationRepository;
 import com.example.repository.HistoriqueProcessusRepository;
@@ -39,6 +36,20 @@ public class ProcessusSterilisationService {
         this.mouvementBoiteService = mouvementBoiteService;
     }
 
+    /**
+     * Crée un nouveau processus de stérilisation à partir d'une demande acceptée.
+     * Vérifie les machines sélectionnées, initialise le processus à l'état EN_ATTENTE,
+     * met la demande en cours et marque les machines comme actives.
+     *
+     * @param demandeId identifiant de la demande de stérilisation
+     * @param machineLavageId identifiant de la machine de lavage
+     * @param machineAutoclaveId identifiant de la machine de stérilisation
+     * @param commentaire commentaire éventuel associé au processus
+     * @throws IllegalArgumentException si la demande est introuvable ou invalide,
+     *                                  si un processus existe déjà pour cette demande,
+     *                                  ou si une machine est introuvable, du mauvais type
+     *                                  ou inutilisable
+     */
     @Transactional
     public void creerProcessus(Long demandeId,
                                Long machineLavageId,
@@ -108,6 +119,15 @@ public class ProcessusSterilisationService {
         historiqueRepository.save(historique);
     }
 
+    /**
+     * Fait progresser un processus de stérilisation vers son état suivant.
+     * Enregistre le mouvement éventuel de la boîte ainsi qu'une nouvelle entrée
+     * dans l'historique du processus.
+     *
+     * @param processusId identifiant du processus à faire avancer
+     * @throws IllegalArgumentException si le processus est introuvable
+     *                                  ou s'il se trouve déjà dans un état final
+     */
     @Transactional
     public void avancerProcessus(Long processusId) {
         ProcessusSterilisation processus = findById(processusId);
@@ -140,6 +160,16 @@ public class ProcessusSterilisationService {
         processusRepository.saveAndFlush(processus);
     }
 
+    /**
+     * Place un processus de stérilisation à l'état ECHEC.
+     * Met à jour la demande associée, libère les machines utilisées
+     * et enregistre l'échec dans l'historique.
+     *
+     * @param processusId identifiant du processus concerné
+     * @param commentaire commentaire décrivant la cause de l'échec
+     * @throws IllegalArgumentException si le processus est introuvable
+     *                                  ou s'il se trouve déjà dans un état final
+     */
     @Transactional
     public void mettreEnEchec(Long processusId, String commentaire) {
         ProcessusSterilisation processus = findById(processusId);
@@ -175,29 +205,73 @@ public class ProcessusSterilisationService {
         processusRepository.saveAndFlush(processus);
     }
 
+    /**
+     * Finalise un processus de stérilisation arrivé à son terme.
+     * Enregistre la date de fin, termine la demande, stérilise les unités
+     * ayant suivi correctement le cycle, remet éventuellement la boîte
+     * en stock stérile et libère les machines.
+     *
+     * @param processus processus de stérilisation à finaliser
+     */
     private void terminerProcessus(ProcessusSterilisation processus) {
-        processus.setDateFin(LocalDateTime.now());
-        processus.getDemandeSterilisation().setStatut(StatutDemandeSterilisation.TERMINEE);
 
-        mettreBoiteSterile(processus);
+        processus.setDateFin(LocalDateTime.now());
+
+        processus.getDemandeSterilisation()
+                .setStatut(StatutDemandeSterilisation.TERMINEE);
+
+        steriliserMateriels(processus);
+
+        if (processus.getDemandeSterilisation()
+                .getBoiteChirurgicale()
+                .getStatut() != StatutBoite.INCOMPLETE) {
+
+            remettreBoiteEnStockSterile(processus);
+        }
 
         libererMachines(processus);
     }
 
-    private static void mettreBoiteSterile(ProcessusSterilisation processus) {
+    /**
+     * Place la boîte chirurgicale associée au processus
+     * dans le stock stérile.
+     *
+     * @param processus processus contenant la boîte concernée
+     */
+    private static void remettreBoiteEnStockSterile(ProcessusSterilisation processus) {
+
         processus.getDemandeSterilisation()
                 .getBoiteChirurgicale()
                 .setStatut(StatutBoite.EN_STOCK_STERILE);
+    }
+
+    /**
+     * Met à l'état STERILE les unités de matériel de la boîte
+     * qui sont encore à l'état EN_STERILISATION.
+     *
+     * @param processus processus contenant les matériels à mettre à jour
+     */
+    private static void steriliserMateriels(ProcessusSterilisation processus) {
 
         processus.getDemandeSterilisation()
                 .getBoiteChirurgicale()
                 .getMateriels()
-                .forEach(boiteMateriel ->
-                        boiteMateriel.getUniteMateriel()
-                                .setEtat(EtatMateriel.STERILE)
-                );
+                .forEach(boiteMateriel -> {
+
+                    UniteMateriel unite = boiteMateriel.getUniteMateriel();
+
+                    if (unite.getEtat() == EtatMateriel.EN_STERILISATION) {
+                        unite.setEtat(EtatMateriel.STERILE);
+                    }
+                });
     }
 
+    /**
+     * Libère les machines de lavage et de stérilisation utilisées par le processus.
+     * Leur statut repasse à IDLE et leur cycle en cours est supprimé.
+     *
+     * @param processus processus utilisant les machines à libérer
+     */
     private void libererMachines(ProcessusSterilisation processus) {
         Machine lavage = processus.getMachineLavage();
         Machine autoclave = processus.getMachineAutoclave();
@@ -213,23 +287,49 @@ public class ProcessusSterilisationService {
         }
     }
 
+    /**
+     * Vérifie qu'une machine peut être utilisée pour un processus de stérilisation.
+     *
+     * @param machine machine à contrôler
+     * @throws IllegalArgumentException si la machine est en maintenance
+     *                                  ou en erreur
+     */
     private void verifierMachineUtilisable(Machine machine) {
         if (!machine.estUtilisable()) {
             throw new IllegalArgumentException("La machine " + machine.getNom() + " est en maintenance ou en erreur");
         }
     }
 
+    /**
+     * Retourne l'ensemble des processus de stérilisation enregistrés.
+     *
+     * @return la liste de tous les processus de stérilisation
+     */
     @Transactional(readOnly = true)
     public List<ProcessusSterilisation> findAll() {
         return processusRepository.findAll();
     }
 
+    /**
+     * Recherche un processus de stérilisation à partir de son identifiant.
+     *
+     * @param id identifiant du processus recherché
+     * @return le processus de stérilisation correspondant
+     * @throws IllegalArgumentException si le processus est introuvable
+     */
     @Transactional(readOnly = true)
     public ProcessusSterilisation findById(Long id) {
         return processusRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Processus introuvable"));
     }
 
+    /**
+     * Enregistre le mouvement de la boîte associé à un changement d'état
+     * lorsque l'état concerné prévoit un déplacement.
+     *
+     * @param processus processus de stérilisation concerné
+     * @param state état du processus contenant les informations du mouvement
+     */
     private void enregistrerMouvement(ProcessusSterilisation processus, ProcessusState state) {
         if (!state.hasMovement()) {
             return;

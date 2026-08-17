@@ -11,4 +11,6 @@ public interface ProcessusSterilisationRepository extends JpaRepository<Processu
     List<ProcessusSterilisation> findByStatut(StatutProcessusSterilisation statut);
 
     boolean existsByDemandeSterilisationId(Long demandeId);
+
+    boolean existsByMachineLavageIdOrMachineAutoclaveId(Long machineLavageId, Long machineAutoclaveId);
 }

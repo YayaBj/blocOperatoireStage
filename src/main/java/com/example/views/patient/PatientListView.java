@@ -83,11 +83,16 @@ public class PatientListView extends VerticalLayout {
                         "Voulez-vous vraiment supprimer le patient : "
                                 + patient.getNomPatient() + " " + patient.getPrenomPatient() + " ?",
                         () -> {
-                            patientService.deletePatient(patient);
-                            refreshGrid();
+                            try {
+                                patientService.deletePatient(patient);
+                                refreshGrid();
 
-                            Notification.show("Patient supprimé", 3000, Notification.Position.BOTTOM_END)
-                                    .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+                                Notification.show("Patient supprimé", 3000, Notification.Position.BOTTOM_END)
+                                        .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+                            } catch (IllegalArgumentException e) {
+                                Notification.show(e.getMessage(), 4000, Notification.Position.BOTTOM_END)
+                                        .addThemeVariants(NotificationVariant.LUMO_ERROR);
+                            }
                         }
                 );
 

@@ -6,5 +6,6 @@ public enum StatutBoite {
     EN_STERILISATION,
     EN_STOCK_SALE,
     EN_STOCK_STERILE,
-    INCIDENT
+    INCIDENT,
+    INCOMPLETE
 }

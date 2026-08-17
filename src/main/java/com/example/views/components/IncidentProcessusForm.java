@@ -1,11 +1,13 @@
 package com.example.views.components;
 
 import com.example.entity.Machine;
+import com.example.entity.UniteMateriel;
 import com.example.entity.enums.GraviteIncident;
 import com.example.entity.enums.TypeIncidentSterilisation;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
+import com.vaadin.flow.component.checkbox.Checkbox;
 import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.Span;
@@ -21,17 +23,22 @@ public class IncidentProcessusForm extends VerticalLayout {
     private final ComboBox<TypeIncidentSterilisation> typeIncident = new ComboBox<>("Type d’incident");
     private final ComboBox<GraviteIncident> gravite = new ComboBox<>("Gravité");
     private final ComboBox<Machine> machine = new ComboBox<>("Machine concernée");
+    private final ComboBox<UniteMateriel> uniteMateriel = new ComboBox<>("Unité de matériel concernée");
     private final TextArea description = new TextArea("Description");
+    private final Checkbox arreterProcessus = new Checkbox("Arrêter le processus");
 
-    public IncidentProcessusForm(List<Machine> machines,
-                                 Consumer<IncidentProcessusFormData> onSubmit) {
+    public IncidentProcessusForm(
+            List<Machine> machines,
+            List<UniteMateriel> unitesMateriel,
+            Consumer<IncidentProcessusFormData> onSubmit
+    ) {
 
         addClassName("intervention-form");
         setWidthFull();
 
-        configureFields(machines);
+        configureFields(machines, unitesMateriel);
 
-        Button submitBtn = new Button("Déclarer l’échec", event -> onSubmit.accept(getData()));
+        Button submitBtn = new Button("Enregistrer l'incident", event -> onSubmit.accept(getData()));
         submitBtn.addThemeVariants(ButtonVariant.LUMO_ERROR);
         submitBtn.addClassName("primary-action");
 
@@ -41,10 +48,10 @@ public class IncidentProcessusForm extends VerticalLayout {
                 row(typeIncident, gravite)
         );
 
-        Div machineSection = createSection(
+        Div equipmentSection = createSection(
                 "Équipement concerné",
-                "Associer l’incident à une machine si nécessaire.",
-                row(machine)
+                "Associer l’incident à une machine ou une unité de matériel si nécessaire.",
+                row(machine, uniteMateriel, arreterProcessus)
         );
 
         Div descriptionSection = createSection(
@@ -57,10 +64,13 @@ public class IncidentProcessusForm extends VerticalLayout {
         actions.addClassName("form-actions");
         actions.setWidthFull();
 
-        add(incidentSection, machineSection, descriptionSection, actions);
+        add(incidentSection, equipmentSection, descriptionSection, actions);
     }
 
-    private void configureFields(List<Machine> machines) {
+    private void configureFields(
+            List<Machine> machines,
+            List<UniteMateriel> unitesMateriel
+    ) {
         typeIncident.setItems(TypeIncidentSterilisation.values());
         gravite.setItems(GraviteIncident.values());
 
@@ -72,9 +82,52 @@ public class IncidentProcessusForm extends VerticalLayout {
         description.setWidthFull();
         description.setMinHeight("140px");
 
+        uniteMateriel.setItems(unitesMateriel);
+
+        uniteMateriel.setItemLabelGenerator(unite ->
+                unite.getCodeInventaire()
+                        + " - "
+                        + unite.getMateriel().getNomMateriel()
+        );
+
+        uniteMateriel.setClearButtonVisible(true);
+        uniteMateriel.setWidthFull();
+
         typeIncident.setWidthFull();
         gravite.setWidthFull();
         machine.setWidthFull();
+        machine.setVisible(false);
+        uniteMateriel.setVisible(false);
+        arreterProcessus.setVisible(false);
+        arreterProcessus.setValue(false);
+
+        typeIncident.addValueChangeListener(event -> {
+            TypeIncidentSterilisation type = event.getValue();
+
+            boolean incidentMachine =
+                    type == TypeIncidentSterilisation.PANNE_MACHINE;
+
+            boolean incidentMateriel =
+                    type == TypeIncidentSterilisation.MATERIEL_MANQUANT
+                            || type == TypeIncidentSterilisation.MATERIEL_CASSE
+                            || type == TypeIncidentSterilisation.MATERIEL_ENDOMMAGE
+                            || type == TypeIncidentSterilisation.MATERIEL_PERDU;
+
+            machine.setVisible(incidentMachine);
+            uniteMateriel.setVisible(incidentMateriel);
+
+            arreterProcessus.setVisible(incidentMateriel);
+
+            if (!incidentMachine) {
+                machine.clear();
+            }
+
+            if (!incidentMateriel) {
+                arreterProcessus.setValue(false);
+                uniteMateriel.clear();
+            }
+        });
+
     }
 
     private Div createSection(String title, String description, HorizontalLayout... rows) {
@@ -112,16 +165,20 @@ public class IncidentProcessusForm extends VerticalLayout {
     private IncidentProcessusFormData getData() {
         return new IncidentProcessusFormData(
                 machine.getValue() == null ? null : machine.getValue().getId(),
+                uniteMateriel.getValue() == null ? null : uniteMateriel.getValue().getId(),
                 typeIncident.getValue(),
                 gravite.getValue(),
-                description.getValue()
+                description.getValue(),
+                arreterProcessus.getValue()
         );
     }
 
     public record IncidentProcessusFormData(
             Long machineId,
+            Long uniteMaterielId,
             TypeIncidentSterilisation typeIncident,
             GraviteIncident gravite,
-            String description
+            String description,
+            boolean arreterProcessus
     ) {}
 }

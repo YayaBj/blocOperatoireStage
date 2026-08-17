@@ -255,3 +255,53 @@ vaadin-grid {
     border-radius: 10px;
     font-weight: 600;
 }
+
+.dashboard-cards {
+    gap: 16px;
+}
+
+.dashboard-card {
+    flex: 1;
+    min-width: 220px;
+    background: white;
+    border: 1px solid var(--app-border);
+    border-radius: 18px;
+    padding: 18px 20px;
+    box-shadow: var(--app-shadow);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.dashboard-card-value {
+    font-size: 32px;
+    font-weight: 800;
+    color: #0f172a;
+}
+
+.dashboard-card-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: #334155;
+}
+
+.dashboard-card-subtitle {
+    font-size: 13px;
+    color: #64748b;
+}
+
+.dashboard-card-info {
+    border-left: 5px solid #2563eb;
+}
+
+.dashboard-card-warning {
+    border-left: 5px solid #f59e0b;
+}
+
+.dashboard-card-success {
+    border-left: 5px solid #059669;
+}
+
+.dashboard-card-danger {
+    border-left: 5px solid #dc2626;
+}
